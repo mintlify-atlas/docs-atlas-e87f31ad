@@ -1,0 +1,112 @@
+{
+  "projectType": "saas",
+  "projectName": "GweAI",
+  "projectDescription": "AI-powered Web3 DeFi platform for automated crypto investing with DCA strategies, trading, staking vaults, and smart contract execution.",
+  "theme": "aspen",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#1E40AF",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "wallet-connection"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/ai-chat",
+              "features/dca-investing",
+              "features/trading",
+              "features/portfolio",
+              "features/swap",
+              "features/vault-staking"
+            ]
+          },
+          {
+            "group": "Platform Guides",
+            "pages": [
+              "guides/deposit-funds",
+              "guides/subscription-plans",
+              "guides/transaction-history",
+              "guides/faucet"
+            ]
+          },
+          {
+            "group": "Smart Contracts",
+            "pages": [
+              "contracts/overview",
+              "contracts/router",
+              "contracts/liquidity-pool",
+              "contracts/vault-staking",
+              "contracts/subscription"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Blockchain Integration",
+            "pages": [
+              "api/wagmi-config",
+              "api/rpc-providers",
+              "api/contract-addresses"
+            ]
+          },
+          {
+            "group": "AI Services",
+            "pages": [
+              "api/groq-service",
+              "api/query-router",
+              "api/portfolio-service"
+            ]
+          },
+          {
+            "group": "Wallet & Auth",
+            "pages": [
+              "api/wallet-hooks",
+              "api/dynamic-integration"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "AI-powered conversational trading interface with Groq AI",
+    "Automated Dollar Cost Averaging (DCA) strategies",
+    "Spot trading for BTC, ETH, SOL, BNB, XRP, and more",
+    "Vault staking with time-locked positions",
+    "Real-time portfolio tracking and analytics",
+    "Token swapping with DEX integration",
+    "Subscription-based premium features",
+    "Non-custodial smart wallet integration with Dynamic"
+  ],
+  "publicApiSurface": [
+    "DCAPage - AI chat interface for DCA strategies",
+    "MarketListPage - Trading pairs and market overview",
+    "TradingPage - Full trading interface with charts",
+    "PortfolioPage - Portfolio balances and history",
+    "SwapPage - Token swap functionality",
+    "VaultPage - Staking vault management",
+    "DepositPage - Fund deposits with AGW wallet",
+    "SubscriptionPage - Plan management and purchases",
+    "TransactionPage - Transaction history",
+    "FaucetPage - Test token faucet",
+    "useSwapContract - Swap execution hook",
+    "useAgwWallet - AGW wallet integration hook",
+    "useSubscription - Subscription management hook",
+    "generateAIResponse - Groq AI chat service",
+    "getUserPortfolio - Portfolio fetching service",
+    "routeQuery - AI query routing service"
+  ]
+}
