@@ -1,80 +1,498 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get started with GweAI in under 5 minutes - from wallet connection to your first automated DCA trade
 ---
 
-## Get started in three steps
+# Quick Start Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will walk you through setting up GweAI and executing your first automated DCA (Dollar Cost Averaging) strategy in under 5 minutes.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Testnet First**: You'll be using Base Sepolia testnet, so there's no risk while learning the platform.
 </Note>
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- A web browser (Chrome, Firefox, Safari, or Brave)
+- MetaMask, Coinbase Wallet, or WalletConnect-compatible wallet
+- 5 minutes of your time
+
+<Warning>
+  **No Crypto Wallet?** Don't worry! Dynamic allows you to create a wallet using just your email or social accounts.
+</Warning>
+
+## Step 1: Access the Platform
+
+Navigate to the GweAI landing page and click the **Launch App** button.
+
+```typescript
+// The app automatically navigates to the DCA page
+setCurrentPage('dca');
+localStorage.setItem('currentPage', 'dca');
+```
+
+You'll see the AI-powered chat interface with animated suggestions for:
+- DCA/SIP strategies
+- Market analysis
+- Portfolio queries
+
+<Steps>
+
+### Launch the Application
+
+Click the **Launch App** button in the navigation bar or the **Start Investing Now** button on the hero section.
+
+### Explore the Interface
+
+You'll land on the DCA page featuring:
+- AI chat interface with natural language support
+- Animated suggestion chips for common actions
+- Real-time market data and analytics
+
+</Steps>
+
+## Step 2: Connect Your Wallet
+
+GweAI uses Dynamic for advanced wallet authentication with multiple connection options.
+
+<Steps>
+
+### Click Connect Wallet
+
+When you first access the DCA page, you'll see a modal prompting you to connect your wallet.
+
+### Choose Your Connection Method
+
+Select from the recommended wallets:
+
+<Tabs>
+  <Tab title="MetaMask">
+    The most popular Ethereum wallet with browser extension support.
+    
+    1. Click **MetaMask** in the wallet selector
+    2. Approve the connection in the MetaMask popup
+    3. Sign the authentication message
+    
+    ```typescript
+    // Dynamic handles the connection automatically
+    recommendedWallets: [
+      { walletKey: 'metamask' }
+    ]
+    ```
+  </Tab>
+  
+  <Tab title="Coinbase Wallet">
+    Integrated Coinbase smart wallet with seamless UX.
+    
+    1. Click **Coinbase** in the wallet selector
+    2. Authenticate with your Coinbase account
+    3. Approve the connection
+    
+    ```typescript
+    recommendedWallets: [
+      { walletKey: 'coinbase' }
+    ]
+    ```
+  </Tab>
+  
+  <Tab title="WalletConnect">
+    Connect any mobile wallet via QR code scanning.
+    
+    1. Click **WalletConnect** in the wallet selector
+    2. Scan the QR code with your mobile wallet
+    3. Approve the connection on your phone
+    
+    ```typescript
+    recommendedWallets: [
+      { walletKey: 'walletconnect' }
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+### Verify Connection
+
+Once connected, you'll see your wallet address in the navbar and gain access to all platform features.
+
+</Steps>
+
+<Note>
+  **Network Auto-Switch**: GweAI automatically configures your wallet to use Base Sepolia testnet.
+</Note>
+
+## Step 3: Get Testnet Funds
+
+Before trading, you need testnet USDC to execute transactions.
+
+<Steps>
+
+### Navigate to Faucet
+
+Ask the AI: "Take me to the faucet" or navigate manually through the sidebar.
+
+### Request Testnet Tokens
+
+The faucet provides:
+- **Test USDC** - For trading and DCA strategies
+- **Test ETH** - For gas fees on Base Sepolia
+
+### Confirm Receipt
+
+Check your wallet balance in the portfolio section or ask the AI: "Show my portfolio"
+
+</Steps>
+
+## Step 4: Create Your First DCA Strategy
+
+Now let's create an automated Dollar Cost Averaging strategy using natural language.
+
+<Steps>
+
+### Ask the AI
+
+Type a command like:
+
+```
+SIP $100 in BTC every Monday
+```
+
+or
+
+```
+Create DCA plan for ETH with $50 weekly for 6 months
+```
+
+### Review the DCA Card
+
+The AI parses your request and displays a confirmation card with:
+
+```typescript
+interface DCAParameters {
+  amount: number;        // USD amount per purchase
+  token: string;         // Target cryptocurrency
+  frequency: 'daily' | 'weekly' | 'monthly';
+  duration: number;      // Duration in months
+  startDay?: string;     // Optional: specific day for weekly/monthly
+}
+```
+
+Example DCA Card:
+
+| Parameter | Value |
+|-----------|-------|
+| Amount | $100 |
+| Token | BTC |
+| Frequency | Weekly (Monday) |
+| Duration | 12 months |
+
+### Review Strategy Details
+
+The card shows:
+- Total investment amount
+- Estimated number of purchases
+- Frequency and schedule
+- Target asset
+
+### Approve the Strategy
+
+Click **Approve DCA Plan** to activate your automated investment strategy.
+
+</Steps>
+
+<Warning>
+  **Testnet Simulation**: Currently, DCA approval is simulated on testnet. Smart contract integration coming soon!
+</Warning>
+
+## Step 5: Execute Your First Trade
+
+While DCA runs automatically, you can also execute instant trades using AI commands.
+
+<Steps>
+
+### Buy Cryptocurrency
+
+Use natural language to buy crypto:
+
+```
+Buy $50 worth of ETH
+```
+
+Or be more specific:
+
+```
+Buy 0.01 BTC with 0.5% slippage
+```
+
+### Review Trade Confirmation
+
+The AI generates a trade confirmation card:
+
+```typescript
+interface TradeParams {
+  type: 'buy' | 'sell' | 'swap';
+  token: string;           // For buy/sell
+  fromToken?: string;      // For swap
+  toToken?: string;        // For swap
+  amount: number;          // USD for buy, token amount for sell
+  slippage?: number;       // Default 0.5%
+}
+```
+
+### Confirm Transaction
+
+Click **Confirm Trade** to execute the blockchain transaction.
+
+You'll see:
+1. **Processing message** - "Please confirm in your wallet"
+2. **Wallet popup** - Approve the transaction
+3. **Success confirmation** - With transaction hash and explorer link
+
+```typescript
+// Transaction executed on Base Sepolia
+const txHash = await executeSwap({
+  tokenInAddress: USDC_ADDRESS,
+  tokenOutAddress: ETH_ADDRESS,
+  amountIn: '50',
+  slippageBps: 50  // 0.5%
+});
+```
+
+### View on Explorer
+
+Click the explorer link to verify your transaction on Base Sepolia:
+
+```
+https://sepolia.basescan.org/tx/0x...
+```
+
+</Steps>
+
+## Step 6: Monitor Your Portfolio
+
+Track your investments and strategy performance in real-time.
+
+<Steps>
+
+### Check Balances
+
+Ask the AI:
+
+```
+Show my portfolio
+```
+
+or
+
+```
+What's my BTC balance?
+```
+
+### View Portfolio Response
+
+The AI returns formatted portfolio data:
+
+```markdown
+📊 **Your Portfolio**
+
+| Asset | Balance | USD Value | 24h Change |
+|-------|---------|-----------|------------|
+| BTC   | 0.0234  | $2,340    | +5.2%      |
+| ETH   | 1.256   | $3,456    | +3.1%      |
+| USDC  | 5,432   | $5,432    | 0.0%       |
+
+**Total Portfolio Value:** $11,228
+```
+
+### Navigate to Portfolio Page
+
+For detailed analytics, navigate to the Portfolio section via the sidebar to see:
+- Asset allocation charts
+- Performance over time
+- Transaction history
+- DCA strategy status
+
+</Steps>
+
+## Common AI Commands
+
+Here are some popular commands to try:
+
+### Trading Commands
+
+```bash
+# Buy cryptocurrency
+Buy $100 worth of SOL
+Purchase 0.5 ETH
+
+# Sell cryptocurrency  
+Sell all my DOGE
+Sell 50% of my BTC holdings
+
+# Swap between assets
+Swap 1000 USDC to ETH
+Convert all my ADA to BTC
+```
+
+### DCA Commands
+
+```bash
+# Create DCA strategies
+SIP $200 in ETH every week
+DCA $100 monthly into BTC for 12 months
+Set up weekly $50 investment in SOL
+```
+
+### Portfolio Commands
+
+```bash
+# Check balances
+Show my portfolio
+What's my ETH balance?
+How much USDC do I have?
+
+# Market analysis
+BTC price today
+Compare ETH vs BTC performance
+Show top 10 cryptocurrencies
+```
+
+<Note>
+  **Natural Language**: The AI understands context and variations. Feel free to ask in your own words!
+</Note>
+
+## Advanced Features
+
+### Vault Locking
+
+Prevent emotional panic selling by locking assets in a time-locked vault:
+
+```
+Lock my BTC for 6 months
+```
+
+### AI Market Analysis
+
+Get real-time market insights powered by Galadriel AI:
+
+```
+Analyze BTC market sentiment
+What's the best time to buy ETH?
+```
+
+### Multi-Token DCA
+
+Create diversified DCA strategies:
+
+```
+Automate $150 weekly: $50 BTC, $50 ETH, $50 SOL
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Wallet not connecting">
+    **Solutions:**
+    
+    1. Refresh the page and try again
+    2. Make sure your wallet extension is unlocked
+    3. Check if you're on the correct network (Base Sepolia)
+    4. Try a different wallet connector (MetaMask, Coinbase, WalletConnect)
+    
+    ```typescript
+    // Network configuration is automatic
+    overrides: {
+      evmNetworks: () => [{
+        chainId: 84532,
+        chainName: 'Base Sepolia'
+      }]
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Transaction failing">
+    **Common causes:**
+    
+    - Insufficient USDC balance
+    - Insufficient ETH for gas fees
+    - Slippage tolerance too low
+    - Network congestion
+    
+    **Solutions:**
+    
+    1. Check your USDC and ETH balances
+    2. Visit the faucet to get more testnet tokens
+    3. Increase slippage tolerance (try 1-2%)
+    4. Wait a few minutes and retry
+  </Accordion>
+  
+  <Accordion title="AI not understanding commands">
+    **Tips for better AI interaction:**
+    
+    - Be specific about amounts and tokens
+    - Use full token names or standard symbols (BTC, ETH, SOL)
+    - Include the action verb (buy, sell, swap, create)
+    - For DCA, specify frequency and duration
+    
+    **Examples:**
+    
+    ❌ "Get some Bitcoin"
+    ✅ "Buy $100 worth of BTC"
+    
+    ❌ "Weekly investment"
+    ✅ "SIP $50 in ETH every week for 6 months"
+  </Accordion>
+  
+  <Accordion title="Portfolio not updating">
+    **Solutions:**
+    
+    1. Wait 10-15 seconds for blockchain confirmation
+    2. Refresh your portfolio: ask "Show my portfolio" again
+    3. Check the transaction on Base Sepolia explorer
+    4. Verify your wallet is still connected
+    
+    ```typescript
+    // Portfolio data fetched from wallet in real-time
+    const portfolio = await getUserPortfolio(address);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Wallet Connection Deep Dive" icon="wallet" href="/wallet-connection">
+    Learn advanced Dynamic wallet features and configuration
+  </Card>
+  
+  <Card title="DCA Strategies" icon="chart-line" href="/features/dca-investing">
+    Learn advanced DCA investment strategies
+  </Card>
+  
+  <Card title="AI Trading Guide" icon="brain" href="/features/ai-chat">
+    Master AI-powered trading commands
+  </Card>
+  
+  <Card title="Smart Contracts" icon="code" href="/contracts/overview">
+    Understand the underlying smart contract architecture
+  </Card>
+  
+  <Card title="Portfolio Tracking" icon="chart-pie" href="/features/portfolio">
+    Monitor your investments and track performance
+  </Card>
+</CardGroup>
+
+## Video Tutorial
+
+<Note>
+  **Coming Soon**: Watch our complete video walkthrough covering all steps from wallet connection to your first automated DCA trade.
+</Note>
+
+---
+
+<Warning>
+  **Remember**: You're on testnet! Experiment freely without risk before moving to mainnet.
+</Warning>
+
+Congratulations! You've successfully set up GweAI and executed your first automated crypto investment strategy. 🎉

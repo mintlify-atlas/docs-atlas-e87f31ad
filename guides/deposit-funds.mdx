@@ -1,0 +1,216 @@
+---
+title: 'Depositing Funds'
+description: 'Learn how to connect your wallet and deposit funds into GweAI'
+---
+
+# Depositing Funds
+
+The GweAI platform uses Dynamic SDK with embedded wallet technology, allowing you to connect and manage multiple cryptocurrency assets seamlessly.
+
+## Connecting Your Wallet
+
+<Steps>
+  <Step title="Navigate to Deposit Page">
+    Click on the "Deposit" link in the navigation menu to access the deposit interface.
+  </Step>
+
+  <Step title="Connect Your Wallet">
+    Click the "Connect Wallet" button to open the Dynamic authentication flow. You can:
+    - Create a new embedded wallet using email/social login
+    - Connect an existing crypto wallet (MetaMask, Coinbase, etc.)
+    - Use passkey authentication for enhanced security
+  </Step>
+
+  <Step title="Wait for Wallet Creation">
+    If you're a new user, the platform will automatically create an embedded wallet for you. This process typically takes a few seconds.
+    
+    <Note>
+      Your wallet is created automatically when you sign in for the first time. You'll see a loading screen with the message "Creating your wallet..." during this process.
+    </Note>
+  </Step>
+
+  <Step title="View Your Wallet Address">
+    Once connected, your wallet address and balances will be displayed on the deposit card.
+  </Step>
+</Steps>
+
+## Supported Assets
+
+GweAI supports multiple cryptocurrency tokens on the Base Sepolia network:
+
+| Token | Symbol | Decimals | Use Case |
+|-------|--------|----------|----------|
+| Ethereum | ETH | 18 | Gas fees and trading |
+| USD Coin | USDC | 6 | Primary trading pair |
+| Bitcoin | BTC | 8 | Trading asset |
+| Solana | SOL | 9 | Trading asset |
+| BNB | BNB | 18 | Trading asset |
+| Ripple | XRP | 6 | Trading asset |
+| Toncoin | TON | 9 | Trading asset |
+| Avalanche | AVAX | 18 | Trading asset |
+| Tron | TRX | 6 | Trading asset |
+| Cardano | ADA | 6 | Trading asset |
+| Dogecoin | DOGE | 8 | Trading asset |
+
+## Viewing Your Balances
+
+After connecting your wallet:
+
+1. **Main Balance Card** displays your primary selected token balance
+2. **Assets Panel** shows all tokens with non-zero balances
+3. **Portfolio Value** shows the total USD value of all your holdings
+
+<Note>
+Balances are automatically refreshed every 15 seconds to ensure you have the most up-to-date information.
+</Note>
+
+## Depositing Tokens
+
+To deposit tokens into your GweAI wallet:
+
+<Steps>
+  <Step title="Get Your Wallet Address">
+    Copy your wallet address from the deposit card by clicking the address or scanning the QR code.
+  </Step>
+
+  <Step title="Send Tokens">
+    Send tokens from any external wallet or exchange to your GweAI wallet address on the Base Sepolia network.
+    
+    <Warning>
+      Always double-check that you're sending to the correct address and network (Base Sepolia). Sending to the wrong network may result in permanent loss of funds.
+    </Warning>
+  </Step>
+
+  <Step title="Wait for Confirmation">
+    Your deposit will appear in your balance after network confirmation. Recent deposits are shown in the "Recent Activity" section.
+  </Step>
+</Steps>
+
+## Sending Tokens
+
+You can send tokens directly from your GweAI wallet:
+
+<Steps>
+  <Step title="Open Assets Panel">
+    Click "View Assets" or "Show Assets" to see all your token balances.
+  </Step>
+
+  <Step title="Select Token">
+    Find the token you want to send and click the "Send" button on that token card.
+  </Step>
+
+  <Step title="Enter Details">
+    In the send modal:
+    - Enter the recipient's wallet address
+    - Enter the amount you want to send
+    - Click "MAX" to send your entire balance (minus gas fees for ETH)
+  </Step>
+
+  <Step title="Confirm Transaction">
+    Click "Send" and confirm the transaction in the popup. The transaction will be processed on-chain.
+  </Step>
+</Steps>
+
+<Tip>
+The send modal shows your current balance for the selected token, making it easy to avoid insufficient balance errors.
+</Tip>
+
+## Transaction History
+
+Your recent deposit and withdrawal transactions are displayed in the "Recent Activity" section:
+
+- **Type**: Deposit or Withdrawal
+- **Amount**: Token quantity and symbol
+- **Status**: Completed, Pending, or Failed
+- **Time**: Relative time since transaction
+- **Explorer Link**: Click any transaction to view it on BaseScan
+
+<Note>
+Transaction history is stored locally and synced with the backend. Up to 20 recent transactions are kept in your history.
+</Note>
+
+## Security Features
+
+### Export Private Key
+
+You can export your wallet's private key for backup:
+
+1. Click your wallet address or the settings icon
+2. Select "Export Private Key" from the menu
+3. Complete any required MFA challenges
+
+<Warning>
+Never share your private key with anyone. Store it securely offline. Anyone with your private key has full access to your funds.
+</Warning>
+
+### Passkey MFA
+
+For enhanced security, you can add passkey-based multi-factor authentication:
+
+1. Click your wallet address in the top right
+2. Navigate to security settings
+3. Add a passkey using your device's biometric authentication
+
+<Tip>
+Passkeys provide a more secure and convenient alternative to traditional 2FA methods.
+</Tip>
+
+## Integration Example
+
+Here's how the deposit system integrates with the wallet hook:
+
+```typescript
+import { useAgwWallet } from './hooks/useAgwWallet';
+
+function DepositComponent() {
+  const {
+    address,
+    connected,
+    ethBalance,
+    usdcBalance,
+    refreshBalance,
+    sendTransaction,
+    sendToken
+  } = useAgwWallet();
+
+  // Send ETH
+  await sendTransaction(
+    '0xRecipientAddress',
+    '0.1', // Amount in ETH
+    'ETH'
+  );
+
+  // Send USDC
+  await sendToken(
+    '0xUSDC_CONTRACT_ADDRESS',
+    '0xRecipientAddress',
+    '100', // Amount in USDC
+    6 // USDC decimals
+  );
+}
+```
+
+## Troubleshooting
+
+### Wallet Not Connecting
+
+- Ensure you have a stable internet connection
+- Try refreshing the page
+- Clear your browser cache and cookies
+- Disable browser extensions that might interfere
+
+### Balance Not Updating
+
+- Click the refresh icon to manually update balances
+- Check that your transaction was confirmed on-chain
+- Wait for the 15-second auto-refresh cycle
+
+### Transaction Failed
+
+- Ensure you have sufficient balance (including gas fees)
+- Verify the recipient address is valid
+- Check that you're on the correct network (Base Sepolia)
+
+<Note>
+If you continue experiencing issues, contact support with your wallet address and transaction hash for assistance.
+</Note>

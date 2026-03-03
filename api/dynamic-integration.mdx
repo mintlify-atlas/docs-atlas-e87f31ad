@@ -1,0 +1,725 @@
+---
+title: 'Dynamic Integration'
+description: 'Dynamic SDK setup and configuration for embedded wallets'
+icon: 'plug'
+---
+
+## Overview
+
+GweAI uses [Dynamic](https://dynamic.xyz) for wallet authentication and embedded wallet creation. This page covers the complete setup and configuration.
+
+<Note>
+  Dynamic provides passwordless embedded wallets with no browser extension required. Users can authenticate via email, social logins, or traditional wallet connections.
+</Note>
+
+---
+
+## Setup
+
+### Installation
+
+```bash
+npm install @dynamic-labs/sdk-react-core @dynamic-labs/ethereum
+```
+
+### Environment Variables
+
+Add your Dynamic environment ID to `.env`:
+
+```bash
+VITE_DYNAMIC_ENVIRONMENT_ID=your_environment_id_here
+```
+
+<Info>
+  Get your environment ID from the [Dynamic Dashboard](https://app.dynamic.xyz).
+</Info>
+
+---
+
+## DynamicContextProvider
+
+Wrap your application with `DynamicContextProvider` in your root component.
+
+### Basic Setup
+
+```typescript main.tsx
+import ReactDOM from 'react-dom/client';
+import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
+import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App';
+
+const queryClient = new QueryClient();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <DynamicContextProvider
+    settings={{
+      environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID,
+      walletConnectors: [EthereumWalletConnectors],
+    }}
+  >
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </DynamicContextProvider>
+);
+```
+
+### Full Configuration
+
+GweAI's production configuration from `main.tsx`:
+
+```typescript main.tsx
+import ReactDOM from 'react-dom/client';
+import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
+import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App.tsx';
+import './index.css';
+import { registerServiceWorker } from './utils/serviceWorkerRegistration';
+import { initializeSecurity } from './utils/security';
+import { suppressDynamicLogs } from './utils/suppressDynamicLogs';
+
+// Initialize minimal security (like Uniswap/Hyperliquid)
+initializeSecurity();
+
+// Suppress Dynamic SDK debug logs
+suppressDynamicLogs();
+
+// Register service worker for PWA functionality
+registerServiceWorker();
+
+const queryClient = new QueryClient();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <DynamicContextProvider
+    settings={{
+      environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID,
+      walletConnectors: [EthereumWalletConnectors],
+      
+      // Use connect-and-sign for authentication support
+      initialAuthenticationMode: 'connect-and-sign',
+      
+      // Recommended wallets configuration
+      recommendedWallets: [
+        { walletKey: 'metamask' },
+        { walletKey: 'coinbase' },
+        { walletKey: 'walletconnect' },
+      ],
+      
+      // Privacy settings for faster load
+      privacyPolicyUrl: undefined,
+      termsOfServiceUrl: undefined,
+      
+      // Network overrides - completely override default networks
+      overrides: {
+        evmNetworks: () => [
+          // Base Sepolia
+          {
+            blockExplorerUrls: ['https://sepolia.basescan.org'],
+            chainId: 84532,
+            chainName: 'Base Sepolia',
+            iconUrls: ['https://avatars.githubusercontent.com/u/108554348?s=280&v=4'],
+            name: 'Base Sepolia Testnet',
+            nativeCurrency: {
+              decimals: 18,
+              name: 'ETH',
+              symbol: 'ETH',
+            },
+            networkId: 84532,
+            rpcUrls: ['https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP'],
+            vanityName: 'Base Sepolia',
+          },
+          // BNB Smart Chain Testnet
+          {
+            blockExplorerUrls: ['https://testnet.bscscan.com'],
+            chainId: 97,
+            chainName: 'BSC Testnet',
+            iconUrls: ['https://s2.coinmarketcap.com/static/img/coins/64x64/1839.png'],
+            name: 'Binance Smart Chain Testnet',
+            nativeCurrency: {
+              decimals: 18,
+              name: 'tBNB',
+              symbol: 'tBNB',
+            },
+            networkId: 97,
+            rpcUrls: [
+              'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+              'https://bsc-testnet.publicnode.com'
+            ],
+            vanityName: 'BSC Testnet',
+          },
+        ],
+      },
+      
+      // Event listeners for wallet actions - optimized
+      events: {
+        onAuthSuccess: (args) => {
+          // Minimal storage for faster response
+          if (args.user?.userId) {
+            localStorage.setItem('dynamic_user_id', args.user.userId);
+          }
+          console.log('✅ Auth successful:', args.user?.email || args.primaryWallet?.address);
+        },
+        
+        onAuthFailure: (error) => {
+          // Log auth errors for debugging
+          console.error('❌ Auth failed:', error || 'Unknown error');
+        },
+        
+        onLogout: () => {
+          // Fast cleanup
+          localStorage.removeItem('dynamic_user_id');
+        },
+        
+        onEmbeddedWalletCreated: () => {
+          // Wallet created successfully
+        },
+      },
+    }}
+  >
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </DynamicContextProvider>
+);
+```
+
+---
+
+## Configuration Options
+
+### Authentication Mode
+
+<ParamField path="initialAuthenticationMode" type="string">
+  Authentication mode for the SDK.
+  
+  - `"connect-only"`: Only wallet connection (no signature)
+  - `"connect-and-sign"`: Require signature after connection (recommended)
+</ParamField>
+
+```typescript
+settings={{
+  initialAuthenticationMode: 'connect-and-sign',
+}}
+```
+
+### Wallet Connectors
+
+<ParamField path="walletConnectors" type="WalletConnector[]" required>
+  Array of wallet connector plugins.
+</ParamField>
+
+```typescript
+import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
+
+settings={{
+  walletConnectors: [EthereumWalletConnectors],
+}}
+```
+
+### Recommended Wallets
+
+<ParamField path="recommendedWallets" type="RecommendedWallet[]">
+  Wallets to show at the top of the connection modal.
+</ParamField>
+
+```typescript
+settings={{
+  recommendedWallets: [
+    { walletKey: 'metamask' },
+    { walletKey: 'coinbase' },
+    { walletKey: 'walletconnect' },
+  ],
+}}
+```
+
+### Network Configuration
+
+<ParamField path="overrides.evmNetworks" type="() => NetworkConfig[]">
+  Function returning array of EVM network configurations. This completely overrides Dynamic's default networks.
+</ParamField>
+
+```typescript
+overrides: {
+  evmNetworks: () => [
+    {
+      blockExplorerUrls: ['https://sepolia.basescan.org'],
+      chainId: 84532,
+      chainName: 'Base Sepolia',
+      iconUrls: ['https://avatars.githubusercontent.com/u/108554348?s=280&v=4'],
+      name: 'Base Sepolia Testnet',
+      nativeCurrency: {
+        decimals: 18,
+        name: 'ETH',
+        symbol: 'ETH',
+      },
+      networkId: 84532,
+      rpcUrls: ['https://base-sepolia.g.alchemy.com/v2/YOUR_API_KEY'],
+      vanityName: 'Base Sepolia',
+    },
+  ],
+}
+```
+
+#### NetworkConfig Type
+
+```typescript
+interface NetworkConfig {
+  blockExplorerUrls: string[];
+  chainId: number;
+  chainName: string;
+  iconUrls?: string[];
+  name: string;
+  nativeCurrency: {
+    decimals: number;
+    name: string;
+    symbol: string;
+  };
+  networkId: number;
+  rpcUrls: string[];
+  vanityName: string;
+}
+```
+
+### Event Handlers
+
+<ParamField path="events" type="DynamicEvents">
+  Event callbacks for wallet lifecycle events.
+</ParamField>
+
+```typescript
+events: {
+  onAuthSuccess: (args) => {
+    console.log('User authenticated:', args.user);
+    console.log('Primary wallet:', args.primaryWallet);
+  },
+  
+  onAuthFailure: (error) => {
+    console.error('Auth failed:', error);
+  },
+  
+  onLogout: () => {
+    console.log('User logged out');
+  },
+  
+  onEmbeddedWalletCreated: () => {
+    console.log('Embedded wallet created');
+  },
+}
+```
+
+#### Event Types
+
+<ResponseField name="onAuthSuccess" type="(args: AuthSuccessArgs) => void">
+  Called when user successfully authenticates.
+  
+  **Args:**
+  - `user`: User object with profile data
+  - `primaryWallet`: Primary connected wallet
+</ResponseField>
+
+<ResponseField name="onAuthFailure" type="(error: Error) => void">
+  Called when authentication fails.
+</ResponseField>
+
+<ResponseField name="onLogout" type="() => void">
+  Called when user logs out.
+</ResponseField>
+
+<ResponseField name="onEmbeddedWalletCreated" type="() => void">
+  Called when embedded wallet is created.
+</ResponseField>
+
+### Privacy Settings
+
+<ParamField path="privacyPolicyUrl" type="string | undefined">
+  URL to privacy policy. Set to `undefined` for faster load.
+</ParamField>
+
+<ParamField path="termsOfServiceUrl" type="string | undefined">
+  URL to terms of service. Set to `undefined` for faster load.
+</ParamField>
+
+```typescript
+settings={{
+  privacyPolicyUrl: undefined,
+  termsOfServiceUrl: undefined,
+}}
+```
+
+---
+
+## DynamicUserProfile Component
+
+Add the `DynamicUserProfile` component to enable wallet settings and private key export.
+
+### Usage
+
+```typescript App.tsx
+import { DynamicUserProfile } from '@dynamic-labs/sdk-react-core';
+
+function App() {
+  return (
+    <>
+      <YourApp />
+      {/* Required for wallet export functionality */}
+      <DynamicUserProfile variant="modal" />
+    </>
+  );
+}
+```
+
+### Props
+
+<ParamField path="variant" type="'modal' | 'dropdown'" required>
+  Display variant for user profile.
+  
+  - `"modal"`: Full-screen modal
+  - `"dropdown"`: Dropdown menu
+</ParamField>
+
+---
+
+## Using Dynamic Context
+
+### useDynamicContext Hook
+
+Access Dynamic SDK context in any component:
+
+```typescript
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+
+function MyComponent() {
+  const {
+    primaryWallet,
+    user,
+    setShowAuthFlow,
+    handleLogOut,
+    network,
+    sdkHasLoaded,
+  } = useDynamicContext();
+
+  if (!sdkHasLoaded) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div>
+      {primaryWallet ? (
+        <>
+          <p>Connected: {primaryWallet.address}</p>
+          <button onClick={handleLogOut}>Logout</button>
+        </>
+      ) : (
+        <button onClick={() => setShowAuthFlow(true)}>Connect</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Context Values
+
+<ResponseField name="primaryWallet" type="Wallet | null">
+  Primary connected wallet object.
+</ResponseField>
+
+<ResponseField name="user" type="User | null">
+  User profile object.
+</ResponseField>
+
+<ResponseField name="setShowAuthFlow" type="(show: boolean) => void">
+  Function to open/close authentication modal.
+</ResponseField>
+
+<ResponseField name="handleLogOut" type="() => Promise<void>">
+  Function to logout user.
+</ResponseField>
+
+<ResponseField name="network" type="number">
+  Current network chain ID.
+</ResponseField>
+
+<ResponseField name="sdkHasLoaded" type="boolean">
+  Whether SDK has finished loading.
+</ResponseField>
+
+<ResponseField name="networkConfigurations" type="NetworkConfig[]">
+  Available network configurations.
+</ResponseField>
+
+---
+
+## Additional Hooks
+
+### useUserWallets
+
+Get all connected wallets (multi-wallet support):
+
+```typescript
+import { useUserWallets } from '@dynamic-labs/sdk-react-core';
+
+function WalletList() {
+  const userWallets = useUserWallets();
+
+  return (
+    <ul>
+      {userWallets.map(wallet => (
+        <li key={wallet.id}>
+          {wallet.address} ({wallet.connector.name})
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### useIsLoggedIn
+
+Check if user is logged in:
+
+```typescript
+import { useIsLoggedIn } from '@dynamic-labs/sdk-react-core';
+
+function AuthStatus() {
+  const isLoggedIn = useIsLoggedIn();
+
+  return <div>{isLoggedIn ? 'Logged In' : 'Logged Out'}</div>;
+}
+```
+
+---
+
+## Network Configuration
+
+### Base Sepolia (Primary Network)
+
+```typescript
+{
+  blockExplorerUrls: ['https://sepolia.basescan.org'],
+  chainId: 84532,
+  chainName: 'Base Sepolia',
+  name: 'Base Sepolia Testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'ETH',
+    symbol: 'ETH',
+  },
+  networkId: 84532,
+  rpcUrls: ['https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP'],
+  vanityName: 'Base Sepolia',
+}
+```
+
+### BNB Smart Chain Testnet
+
+```typescript
+{
+  blockExplorerUrls: ['https://testnet.bscscan.com'],
+  chainId: 97,
+  chainName: 'BSC Testnet',
+  name: 'Binance Smart Chain Testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'tBNB',
+    symbol: 'tBNB',
+  },
+  networkId: 97,
+  rpcUrls: [
+    'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+    'https://bsc-testnet.publicnode.com'
+  ],
+  vanityName: 'BSC Testnet',
+}
+```
+
+---
+
+## Performance Optimizations
+
+### Suppress Debug Logs
+
+```typescript utils/suppressDynamicLogs.ts
+export function suppressDynamicLogs() {
+  const originalConsoleLog = console.log;
+  console.log = (...args) => {
+    // Filter out Dynamic SDK logs
+    if (args[0]?.includes?.('[Dynamic]')) return;
+    originalConsoleLog(...args);
+  };
+}
+```
+
+### Lazy Load Components
+
+Use lazy loading with Dynamic to reduce initial bundle size:
+
+```typescript
+import { lazy, Suspense } from 'react';
+import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
+
+const App = lazy(() => import('./App'));
+
+function Root() {
+  return (
+    <DynamicContextProvider settings={{...}}>
+      <Suspense fallback={<LoadingScreen />}>
+        <App />
+      </Suspense>
+    </DynamicContextProvider>
+  );
+}
+```
+
+---
+
+## Common Patterns
+
+### Protected Route
+
+```typescript
+import { useIsLoggedIn } from '@dynamic-labs/sdk-react-core';
+import { Navigate } from 'react-router-dom';
+
+function ProtectedRoute({ children }) {
+  const isLoggedIn = useIsLoggedIn();
+
+  if (!isLoggedIn) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+}
+```
+
+### Connect Button
+
+```typescript
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+
+function ConnectButton() {
+  const { primaryWallet, setShowAuthFlow, handleLogOut } = useDynamicContext();
+
+  if (primaryWallet) {
+    return (
+      <button onClick={handleLogOut}>
+        {primaryWallet.address.slice(0, 6)}...{primaryWallet.address.slice(-4)}
+      </button>
+    );
+  }
+
+  return (
+    <button onClick={() => setShowAuthFlow(true)}>
+      Connect Wallet
+    </button>
+  );
+}
+```
+
+### User Profile Trigger
+
+```typescript
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+
+function ProfileButton() {
+  const context = useDynamicContext();
+  const setShowDynamicUserProfile = (context as any).setShowDynamicUserProfile;
+
+  return (
+    <button onClick={() => setShowDynamicUserProfile(true)}>
+      Profile Settings
+    </button>
+  );
+}
+```
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="SDK not loading">
+    Ensure `environmentId` is correctly set:
+    
+    ```bash
+    VITE_DYNAMIC_ENVIRONMENT_ID=your_actual_environment_id
+    ```
+    
+    Check that the environment variable is accessible:
+    
+    ```typescript
+    console.log(import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID);
+    ```
+  </Accordion>
+
+  <Accordion title="Network not switching">
+    Make sure you've configured the network in the `overrides.evmNetworks` array:
+    
+    ```typescript
+    overrides: {
+      evmNetworks: () => [
+        // Your custom network config
+      ],
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Embedded wallet not creating">
+    Check that you've enabled embedded wallets in the Dynamic dashboard:
+    
+    1. Go to [Dynamic Dashboard](https://app.dynamic.xyz)
+    2. Navigate to Settings > Wallets
+    3. Enable "Embedded Wallets"
+  </Accordion>
+
+  <Accordion title="User profile modal not opening">
+    Ensure you've added the `DynamicUserProfile` component:
+    
+    ```typescript
+    import { DynamicUserProfile } from '@dynamic-labs/sdk-react-core';
+    
+    function App() {
+      return (
+        <>
+          <YourApp />
+          <DynamicUserProfile variant="modal" />
+        </>
+      );
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Dynamic Docs" icon="book" href="https://docs.dynamic.xyz">
+    Official Dynamic SDK documentation
+  </Card>
+  <Card title="React SDK Hooks" icon="react" href="https://docs.dynamic.xyz/react-sdk/hooks">
+    Complete hooks reference
+  </Card>
+  <Card title="Dynamic Dashboard" icon="chart-line" href="https://app.dynamic.xyz">
+    Manage your Dynamic configuration
+  </Card>
+  <Card title="GitHub Examples" icon="github" href="https://github.com/dynamic-labs/examples">
+    Example implementations
+  </Card>
+</CardGroup>
+
+---
+
+## File Locations
+
+<CodeGroup>
+```typescript main.tsx
+// Source: Frontend/Landingpage/src/main.tsx
+```
+
+```typescript App.tsx
+// Source: Frontend/Landingpage/src/App.tsx
+```
+</CodeGroup>

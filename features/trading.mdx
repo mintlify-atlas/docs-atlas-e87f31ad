@@ -1,0 +1,485 @@
+---
+title: 'Trading'
+description: 'Real-time cryptocurrency trading with advanced charts and order execution'
+icon: 'chart-candlestick'
+---
+
+## Overview
+
+GweAI's Trading interface provides a professional-grade platform for buying and selling cryptocurrencies with real-time price charts, order placement, and trade history.
+
+<Note>
+All trading occurs on **Base Sepolia Testnet** with gas fees paid in USDC. The platform uses verified smart contracts for secure transactions.
+</Note>
+
+## Accessing the Trading Page
+
+<Steps>
+  <Step title="Navigate to Markets">
+    Click **Markets** in the navigation menu
+  </Step>
+  <Step title="Select a Trading Pair">
+    Choose a pair from the list (e.g., BTC/USDC, ETH/USDC)
+  </Step>
+  <Step title="Connect Wallet">
+    Click **Connect Wallet** to enable trading
+  </Step>
+  <Step title="Start Trading">
+    Place buy or sell orders using the order panel
+  </Step>
+</Steps>
+
+## Trading Interface Components
+
+### Market List View
+
+Before entering a specific pair, you'll see the market overview:
+
+<CardGroup cols={2}>
+  <Card title="Live Prices" icon="dollar-sign">
+    Real-time prices from CoinGecko API
+  </Card>
+  <Card title="24h Change" icon="chart-line">
+    Price movement percentage
+  </Card>
+  <Card title="Volume" icon="bars-staggered">
+    Trading volume in USD
+  </Card>
+  <Card title="Sparkline Charts" icon="chart-area">
+    Mini price history visualization
+  </Card>
+</CardGroup>
+
+### Trading Pair Selection
+
+Supported trading pairs:
+
+| Pair | Token | Market Cap Rank |
+|------|-------|----------------|
+| BTC/USDC | Bitcoin | #1 |
+| ETH/USDC | Ethereum | #2 |
+| XRP/USDC | Ripple | #3 |
+| BNB/USDC | BNB Chain | #4 |
+| SOL/USDC | Solana | #5 |
+| DOGE/USDC | Dogecoin | #6 |
+| ADA/USDC | Cardano | #7 |
+| TRX/USDC | TRON | #8 |
+| AVAX/USDC | Avalanche | #9 |
+| TON/USDC | Toncoin | #10 |
+
+## Trading Page Layout
+
+### Left Panel: Order Placement
+
+<Frame>
+  <img src="/images/trading-order-panel.png" alt="Order placement panel" />
+</Frame>
+
+The order panel allows you to:
+
+1. **Toggle Buy/Sell** - Switch between buying and selling
+2. **Enter Amount** - Specify quantity in USDC or token amount
+3. **View Estimates** - See estimated output before execution
+4. **Place Order** - Execute the trade
+
+### Right Panel: TradingView Chart
+
+Integrated TradingView widget provides:
+
+- **Real-time candles** from major exchanges
+- **Technical indicators** (moving averages, RSI, etc.)
+- **Drawing tools** for analysis
+- **Multiple timeframes** (1m, 5m, 1h, 1d, etc.)
+
+```typescript
+// TradingView integration from TradingPage.tsx
+widget = new window.TradingView.widget({
+  symbol: 'BINANCE:BTCUSDC',  // Auto-switches based on pair
+  interval: 'D',
+  theme: 'dark',
+  style: '1',  // Candlestick
+  toolbar_bg: '#000000',
+  enable_publishing: false,
+  allow_symbol_change: true
+});
+```
+
+### Bottom Panel: Trade History
+
+Your personal trade history shows:
+
+- **Price** at execution
+- **Amount** traded
+- **Total** value in USDC
+- **Time** of transaction
+- **Type** (Buy/Sell)
+- **Transaction Hash** with explorer link
+
+## Placing Orders
+
+### Buy Order Flow
+
+<Steps>
+  <Step title="Select Buy">
+    Click the **Buy** button in the order panel
+  </Step>
+  <Step title="Enter USDC Amount">
+    Type the amount of USDC you want to spend
+    
+    Example: `100` (for $100 worth)
+  </Step>
+  <Step title="Review Estimate">
+    The panel shows estimated token amount you'll receive:
+    
+    ```
+    Spending: 100 USDC
+    Receiving: ~0.0022 BTC
+    Price: $45,454.55 per BTC
+    Slippage: 0.5%
+    ```
+  </Step>
+  <Step title="Confirm Transaction">
+    Click **Buy BTC** button
+    
+    Your wallet will prompt for approval
+  </Step>
+  <Step title="Transaction Processing">
+    Wait for blockchain confirmation (typically 2-5 seconds on Base Sepolia)
+  </Step>
+  <Step title="Success">
+    Trade appears in your history
+    
+    Balance updates automatically
+  </Step>
+</Steps>
+
+### Sell Order Flow
+
+<Steps>
+  <Step title="Select Sell">
+    Click the **Sell** button in the order panel
+  </Step>
+  <Step title="Enter Token Amount">
+    Type the amount of tokens to sell
+    
+    Example: `0.5` (for 0.5 SOL)
+    
+    Or click **MAX** to sell entire balance
+  </Step>
+  <Step title="Review Estimate">
+    See USDC you'll receive:
+    
+    ```
+    Selling: 0.5 SOL
+    Receiving: ~69.50 USDC
+    Price: $139 per SOL
+    Slippage: 0.5%
+    ```
+  </Step>
+  <Step title="Confirm & Execute">
+    Click **Sell SOL** → Approve in wallet
+  </Step>
+  <Step title="Receive USDC">
+    USDC appears in your wallet after confirmation
+  </Step>
+</Steps>
+
+## Order Execution Details
+
+### Smart Contract Integration
+
+Trades execute through the verified Router contract:
+
+```typescript
+// From BuyPanel.tsx
+const txHash = await executeSwap({
+  tokenInAddress: USDC_ADDRESS,
+  tokenOutAddress: tokenAddress,
+  amountIn: usdcAmount,
+  tokenInDecimals: 6,  // USDC decimals
+  tokenOutDecimals: tokenDecimals,
+  slippageBps: 50  // 0.5% slippage
+});
+```
+
+### Transaction Steps
+
+<AccordionGroup>
+  <Accordion title="Step 1: Approval" icon="check">
+    **For First-Time Trading:**
+    
+    The contract requests approval to spend your tokens:
+    
+    ```typescript
+    // One-time unlimited approval for better UX
+    await walletClient.sendTransaction({
+      to: tokenAddress,
+      data: approveData  // approve(router, maxUint256)
+    });
+    ```
+    
+    **Why?** ERC-20 tokens require explicit permission for contracts to transfer them.
+  </Accordion>
+
+  <Accordion title="Step 2: Swap Execution" icon="arrow-right-arrow-left">
+    **After Approval:**
+    
+    The swap transaction executes:
+    
+    ```typescript
+    await walletClient.sendTransaction({
+      to: ROUTER_ADDRESS,
+      data: swapData  // swap(tokenIn, tokenOut, amountIn, minAmountOut)
+    });
+    ```
+    
+    The router contract handles the exchange logic.
+  </Accordion>
+
+  <Accordion title="Step 3: Confirmation" icon="circle-check">
+    **Waiting for Blockchain:**
+    
+    ```typescript
+    await publicClient.waitForTransactionReceipt({
+      hash: txHash,
+      confirmations: 2
+    });
+    ```
+    
+    Base Sepolia confirmations are typically under 5 seconds.
+  </Accordion>
+
+  <Accordion title="Step 4: Balance Update" icon="rotate">
+    **Automatic Refresh:**
+    
+    ```typescript
+    // Refreshes all token balances from wallet
+    await refreshBalance();
+    
+    // Fetches updated trade history
+    refetchTrades();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Price Discovery
+
+### Real-Time Price Feeds
+
+Prices come from multiple sources:
+
+```typescript
+// Global price context (PriceContext.tsx)
+const { prices, priceChanges } = useGlobalPrices();
+
+// Fetches from CoinGecko API every 30 seconds
+const fetchPrices = async () => {
+  const response = await fetch(
+    'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,...&vs_currencies=usd&include_24hr_change=true'
+  );
+};
+```
+
+### Slippage Protection
+
+All trades include 0.5% slippage tolerance:
+
+```typescript
+// Minimum output calculation
+const expectedOut = parseUnits(quoteResult.amountOut, tokenOutDecimals);
+const minAmountOut = (expectedOut * BigInt(10000 - 50)) / BigInt(10000);
+// 50 basis points = 0.5%
+```
+
+<Warning>
+**Price Impact:** Large orders may experience price impact beyond slippage. The actual execution price is determined by the AMM pool's liquidity.
+</Warning>
+
+## Trade History
+
+### Fetching Your Trades
+
+The platform fetches your personal trade history from the blockchain:
+
+```typescript
+// From useRecentTrades.ts
+const { trades, loading } = useRecentTrades(
+  tokenAddress,
+  tokenSymbol,
+  tokenDecimals,
+  connectedAddress  // Only shows YOUR trades
+);
+```
+
+### History Display
+
+<Frame>
+  <img src="/images/trade-history-table.png" alt="Trade history table" />
+</Frame>
+
+Each trade shows:
+
+- **Price (USDC):** Execution price per token
+- **Amount:** Quantity of tokens traded
+- **Total (USDC):** Total transaction value
+- **Time:** Local timestamp
+- **Type:** Buy (green) or Sell (red) badge
+- **Transaction:** Link to Base Sepolia explorer
+
+### Pagination
+
+- **10 trades per page** (configurable)
+- **Previous/Next** navigation
+- **Total count** display
+
+## Advanced Features
+
+### Market Sorting
+
+On the Markets page, sort by:
+
+- **Rank** (default) - Market cap ranking
+- **Price** - Highest to lowest
+- **24h Change** - Biggest gainers/losers
+- **Volume** - Most actively traded
+
+### Quick Actions
+
+- **Click row** → Opens trading page for that pair
+- **Trade button** → Direct access to buy/sell
+- **Chart preview** → Sparkline shows recent trend
+
+### Wallet Balance Display
+
+<Info>
+The order panel always shows your current balance:
+- **For Buy:** Available USDC balance
+- **For Sell:** Available token balance
+
+Balances refresh after each transaction.
+</Info>
+
+## Gas and Fees
+
+### Transaction Costs
+
+| Fee Type | Amount | Paid In |
+|----------|--------|--------|
+| **Gas Fee** | ~$0.01-0.50 | USDC |
+| **Protocol Fee** | 0.3% | Output token |
+| **Slippage** | Up to 0.5% | Built into quote |
+
+### Gas Optimization
+
+```typescript
+// One-time approval reduces gas costs
+// First trade: 2 transactions (approve + swap)
+// Subsequent trades: 1 transaction (swap only)
+```
+
+## Security Features
+
+<CardGroup cols={2}>
+  <Card title="Verified Contracts" icon="shield-check">
+    All contract addresses are verified on BaseScan
+  </Card>
+  <Card title="Whitelisted Tokens" icon="list-check">
+    Only approved tokens can be traded
+  </Card>
+  <Card title="Slippage Protection" icon="percent">
+    Automatic limits prevent front-running
+  </Card>
+  <Card title="Non-Custodial" icon="lock">
+    You always control your private keys
+  </Card>
+</CardGroup>
+
+### Contract Validation
+
+```typescript
+// From contracts.ts - Security checks
+const validation = await validateTransaction({
+  contractAddress: ROUTER_ADDRESS,
+  contractType: 'ROUTER',
+  userAddress: address
+});
+
+if (!validation.valid) {
+  throw new Error(validation.error);
+}
+```
+
+## Troubleshooting
+
+### "Insufficient Balance" Error
+
+**Cause:** You don't have enough tokens
+
+**Solution:**
+1. Check your balance in the Portfolio page
+2. For buy orders, ensure you have USDC
+3. For sell orders, verify token balance
+
+### "Transaction Failed" Error
+
+**Cause:** Multiple possible reasons
+
+**Solutions:**
+- **Gas:** Ensure you have USDC for fees
+- **Slippage:** Price moved too much - try again
+- **Approval:** First-time trades need approval
+- **Network:** Check Base Sepolia status
+
+### Chart Not Loading
+
+**Cause:** TradingView script timeout
+
+**Solution:**
+- Refresh the page
+- Check internet connection
+- Try a different browser
+
+<Note>
+**Retry Logic:** The trading page automatically retries loading TradingView up to 3 times with 2-second delays.
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Check Prices Before Trading" icon="magnifying-glass">
+    Always review the current price and 24h change before placing orders
+  </Accordion>
+
+  <Accordion title="Use Limit Orders (Future)" icon="gauge">
+    Currently market orders only - limit orders coming soon
+  </Accordion>
+
+  <Accordion title="Monitor Slippage" icon="eye">
+    Large orders may experience slippage beyond the 0.5% tolerance
+  </Accordion>
+
+  <Accordion title="Keep Transaction Records" icon="folder">
+    Save transaction hashes for tax purposes
+  </Accordion>
+
+  <Accordion title="Test with Small Amounts" icon="flask">
+    Start with small trades to understand the interface
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Portfolio Tracking" icon="wallet" href="/features/portfolio">
+    Monitor your trading performance
+  </Card>
+  <Card title="Token Swaps" icon="arrows-rotate" href="/features/swap">
+    Direct token-to-token exchanges
+  </Card>
+  <Card title="AI Chat" icon="robot" href="/features/ai-chat">
+    Trade using natural language
+  </Card>
+  <Card title="DCA Investing" icon="calendar" href="/features/dca-investing">
+    Automate your investments
+  </Card>
+</CardGroup>

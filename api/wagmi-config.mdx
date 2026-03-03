@@ -1,0 +1,285 @@
+---
+title: 'Wagmi Configuration'
+description: 'Configure Wagmi with Base Sepolia, multiple RPC fallbacks, and wallet connectors for GweAI'
+icon: 'plug'
+---
+
+## Overview
+
+GweAI uses [Wagmi](https://wagmi.sh) for Ethereum wallet connections and blockchain interactions. The configuration includes automatic RPC fallback, multiple wallet connectors, and retry logic for reliable connectivity.
+
+## Configuration
+
+The Wagmi configuration is exported from `wagmi.config.ts`:
+
+```typescript wagmi.config.ts
+import { http, createConfig, fallback } from 'wagmi';
+import { baseSepolia } from 'wagmi/chains';
+import { injected, coinbaseWallet, walletConnect } from 'wagmi/connectors';
+
+const BASE_SEPOLIA_RPCS = [
+  'https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP',
+  'https://base-sepolia.blockpi.network/v1/rpc/public',
+  'https://base-sepolia-rpc.publicnode.com',
+];
+
+export const wagmiConfig = createConfig({
+  chains: [baseSepolia],
+  connectors: [
+    injected(),
+    coinbaseWallet({
+      appName: 'GweAI',
+      preference: 'smartWalletOnly',
+    }),
+    walletConnect({
+      projectId: '3fbb6bba6f1de962d911bb5b5c9ddd26',
+      metadata: {
+        name: 'GweAI',
+        description: 'AI-Powered DeFi Trading Platform',
+        url: 'https://gweai.com',
+        icons: ['https://gweai.com/icon.png'],
+      },
+      showQrModal: true,
+    }),
+  ],
+  transports: {
+    [baseSepolia.id]: fallback(
+      BASE_SEPOLIA_RPCS.map(url => http(url, {
+        timeout: 10000,
+        retryCount: 3,
+        retryDelay: 150,
+      }))
+    ),
+  },
+});
+```
+
+## Supported Chains
+
+<ParamField path="chains" type="Chain[]" default="[baseSepolia]">
+  Currently configured for **Base Sepolia** testnet (Chain ID: 84532)
+</ParamField>
+
+## Wallet Connectors
+
+### Injected Connector
+
+Supports browser extension wallets:
+
+<CodeGroup>
+```typescript Usage
+import { injected } from 'wagmi/connectors';
+
+const connector = injected();
+```
+</CodeGroup>
+
+**Supported Wallets:**
+- MetaMask
+- Brave Wallet
+- Rabby Wallet
+- Any EIP-1193 compatible wallet
+
+### Coinbase Wallet
+
+Configured for Coinbase Smart Wallet (embedded wallet experience):
+
+<ParamField path="appName" type="string" required>
+  Application name displayed in Coinbase Wallet (set to `"GweAI"`)
+</ParamField>
+
+<ParamField path="preference" type="string" default="smartWalletOnly">
+  Wallet type preference. Set to `smartWalletOnly` for embedded wallet experience
+</ParamField>
+
+<CodeGroup>
+```typescript Configuration
+import { coinbaseWallet } from 'wagmi/connectors';
+
+const connector = coinbaseWallet({
+  appName: 'GweAI',
+  preference: 'smartWalletOnly',
+});
+```
+</CodeGroup>
+
+### WalletConnect
+
+Enables connection to 300+ mobile and desktop wallets:
+
+<ParamField path="projectId" type="string" required>
+  WalletConnect Cloud project ID for relay service
+</ParamField>
+
+<ParamField path="metadata.name" type="string" required>
+  Application name displayed in WalletConnect modal
+</ParamField>
+
+<ParamField path="metadata.description" type="string" required>
+  Application description shown to users
+</ParamField>
+
+<ParamField path="metadata.url" type="string" required>
+  Application website URL
+</ParamField>
+
+<ParamField path="metadata.icons" type="string[]" required>
+  Array of icon URLs for branding
+</ParamField>
+
+<ParamField path="showQrModal" type="boolean" default="true">
+  Display QR code modal for mobile wallet connections
+</ParamField>
+
+<CodeGroup>
+```typescript Configuration
+import { walletConnect } from 'wagmi/connectors';
+
+const connector = walletConnect({
+  projectId: '3fbb6bba6f1de962d911bb5b5c9ddd26',
+  metadata: {
+    name: 'GweAI',
+    description: 'AI-Powered DeFi Trading Platform',
+    url: 'https://gweai.com',
+    icons: ['https://gweai.com/icon.png'],
+  },
+  showQrModal: true,
+});
+```
+</CodeGroup>
+
+## Transport Configuration
+
+### Fallback Transport
+
+The configuration uses Wagmi's `fallback` transport for automatic RPC failover:
+
+<ParamField path="timeout" type="number" default="10000">
+  Request timeout in milliseconds (10 seconds)
+</ParamField>
+
+<ParamField path="retryCount" type="number" default="3">
+  Number of retry attempts before moving to next RPC
+</ParamField>
+
+<ParamField path="retryDelay" type="number" default="150">
+  Delay between retry attempts in milliseconds
+</ParamField>
+
+### RPC Endpoints
+
+The transport uses multiple RPC providers in priority order:
+
+<Steps>
+  <Step title="Alchemy (Primary)">
+    `https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP`
+    
+    Best rate limits and reliability
+  </Step>
+  
+  <Step title="BlockPI (Secondary)">
+    `https://base-sepolia.blockpi.network/v1/rpc/public`
+    
+    Public endpoint with 10M requests/day
+  </Step>
+  
+  <Step title="PublicNode (Tertiary)">
+    `https://base-sepolia-rpc.publicnode.com`
+    
+    Community-run fallback endpoint
+  </Step>
+</Steps>
+
+<Note>
+  **Base Sepolia's official RPC** (`https://sepolia.base.org`) was removed due to aggressive rate limiting causing 403 errors. The fallback strategy provides 99.9% uptime.
+</Note>
+
+## Usage Examples
+
+### Initialize Wagmi Config
+
+<CodeGroup>
+```typescript App Setup
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { wagmiConfig } from './wagmi.config';
+
+const queryClient = new QueryClient();
+
+function App() {
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        {/* Your app components */}
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+}
+```
+
+```typescript Connect Wallet
+import { useConnect } from 'wagmi';
+
+function ConnectButton() {
+  const { connectors, connect } = useConnect();
+
+  return (
+    <div>
+      {connectors.map((connector) => (
+        <button
+          key={connector.id}
+          onClick={() => connect({ connector })}
+        >
+          Connect {connector.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+```typescript Read Blockchain Data
+import { useAccount, useBalance } from 'wagmi';
+
+function WalletInfo() {
+  const { address } = useAccount();
+  const { data: balance } = useBalance({ address });
+
+  return (
+    <div>
+      <p>Address: {address}</p>
+      <p>Balance: {balance?.formatted} ETH</p>
+    </div>
+  );
+}
+```
+</CodeGroup>
+
+## Type Definitions
+
+```typescript
+import type { Config } from 'wagmi';
+
+export const wagmiConfig: Config;
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="RPC Providers" icon="server" href="/api/rpc-providers">
+    Learn about RPC fallback strategy and caching
+  </Card>
+  <Card title="Contract Addresses" icon="file-contract" href="/api/contract-addresses">
+    Verified contract addresses on Base Sepolia
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Warning>
+  **Production Deployment**: Replace the demo Alchemy API key with your own production key from [alchemy.com](https://www.alchemy.com/) for higher rate limits.
+</Warning>
+
+<Tip>
+  The fallback transport automatically switches between RPCs if one fails, providing resilient connectivity without manual intervention.
+</Tip>

@@ -1,0 +1,411 @@
+---
+title: 'DCA Investing'
+description: 'Dollar-Cost Averaging (DCA) strategies for systematic crypto investments'
+icon: 'calendar-days'
+---
+
+## Overview
+
+Dollar-Cost Averaging (DCA) is a strategy where you invest a fixed amount at regular intervals, regardless of the asset's price. This reduces the impact of volatility and eliminates the need to time the market.
+
+<Note>
+In GweAI, DCA plans are created through the AI Chat Assistant. The AI helps you design and execute systematic investment strategies.
+</Note>
+
+## What is DCA?
+
+DCA spreads your investment over time instead of investing a lump sum:
+
+- **Traditional:** Invest $1,200 all at once
+- **DCA:** Invest $100 every month for 12 months
+
+### Benefits of DCA
+
+<CardGroup cols={2}>
+  <Card title="Reduced Risk" icon="shield-halved">
+    Spreads purchases across price points, averaging out volatility
+  </Card>
+  <Card title="No Market Timing" icon="clock">
+    Eliminates the stress of trying to "buy the dip"
+  </Card>
+  <Card title="Disciplined Investing" icon="medal">
+    Creates a consistent investment habit
+  </Card>
+  <Card title="Emotional Control" icon="brain">
+    Removes emotion-driven decisions during market swings
+  </Card>
+</CardGroup>
+
+## Creating a DCA Plan
+
+### Using AI Chat
+
+<Steps>
+  <Step title="Open AI Chat">
+    Navigate to the DCA/Chat page from the main menu
+  </Step>
+  <Step title="Describe Your Plan">
+    Tell the AI your DCA strategy in natural language:
+    
+    Examples:
+    - "SIP $100 in BTC every Monday"
+    - "Create DCA plan for ETH with $50 weekly"
+    - "Set up monthly SIP for $200 in SOL"
+  </Step>
+  <Step title="Review the Plan">
+    The AI will show a DCA card with your plan details:
+    - Investment amount per period
+    - Token to invest in
+    - Frequency (daily/weekly/monthly)
+    - Duration (in months)
+    - Start day (if specified)
+  </Step>
+  <Step title="Approve the Plan">
+    Click **"Approve DCA Plan"** to confirm
+  </Step>
+</Steps>
+
+### DCA Parameters
+
+The AI extracts these parameters from your message:
+
+```typescript
+// From groqService.ts
+export interface DCARequest {
+  amount: number;        // $100
+  token: string;         // 'BTC' | 'ETH' | 'SOL'
+  frequency: 'daily' | 'weekly' | 'monthly';
+  duration: number;      // months
+  startDay?: string;     // 'Monday' or '1st', '15th'
+}
+```
+
+## DCA Plan Examples
+
+### Weekly Bitcoin DCA
+
+**User Command:**
+```
+"SIP $100 in BTC every Monday"
+```
+
+**AI Response:**
+<Frame>
+  <img src="/images/dca-card-example.png" alt="DCA Card showing $100 weekly BTC plan" />
+</Frame>
+
+**Plan Details:**
+- **Amount:** $100 per week
+- **Token:** Bitcoin (BTC)
+- **Frequency:** Every Monday
+- **Annual Investment:** $5,200 ($100 × 52 weeks)
+
+### Monthly Ethereum DCA
+
+**User Command:**
+```
+"Create DCA plan for ETH with $50 monthly on the 1st"
+```
+
+**Plan Details:**
+- **Amount:** $50 per month
+- **Token:** Ethereum (ETH)
+- **Frequency:** 1st of every month
+- **Annual Investment:** $600 ($50 × 12 months)
+
+### Custom Solana DCA
+
+**User Command:**
+```
+"Set up monthly SIP for $200 in SOL for 6 months"
+```
+
+**Plan Details:**
+- **Amount:** $200 per month
+- **Token:** Solana (SOL)
+- **Duration:** 6 months
+- **Total Investment:** $1,200
+
+## Frequency Options
+
+<AccordionGroup>
+  <Accordion title="Daily DCA" icon="calendar-day">
+    **Best for:** Active traders, high-frequency averaging
+    
+    **Example:** "Invest $10 in BTC every day"
+    
+    **Pros:**
+    - Maximum price averaging
+    - Smoothest volatility reduction
+    
+    **Cons:**
+    - Higher transaction fees
+    - More management overhead
+  </Accordion>
+
+  <Accordion title="Weekly DCA" icon="calendar-week">
+    **Best for:** Most investors (recommended)
+    
+    **Example:** "$100 in ETH every Monday"
+    
+    **Pros:**
+    - Good balance of averaging and fees
+    - Easy to track and manage
+    - Can align with payday
+    
+    **Cons:**
+    - Slightly less averaging than daily
+  </Accordion>
+
+  <Accordion title="Monthly DCA" icon="calendar">
+    **Best for:** Long-term investors, larger amounts
+    
+    **Example:** "$500 in SOL on the 1st"
+    
+    **Pros:**
+    - Lowest transaction fees
+    - Simplest to manage
+    - Aligns with monthly income
+    
+    **Cons:**
+    - Less price averaging
+    - Higher exposure to single-day prices
+  </Accordion>
+</AccordionGroup>
+
+## DCA vs. Lump Sum
+
+### Scenario Comparison
+
+Imagine investing $1,200 in Bitcoin:
+
+| Strategy | Method | Risk | Timing Dependency |
+|----------|--------|------|-------------------|
+| **Lump Sum** | Invest $1,200 at once | High | Critical - one price point |
+| **Monthly DCA** | $100/month for 12 months | Medium | Low - 12 price points |
+| **Weekly DCA** | $25/week for 48 weeks | Low | Very Low - 48 price points |
+
+### When DCA Outperforms
+
+<CardGroup cols={2}>
+  <Card title="Volatile Markets" icon="chart-line">
+    DCA shines when prices fluctuate significantly
+  </Card>
+  <Card title="Downtrends" icon="arrow-trend-down">
+    Buys more as prices drop, lowering average cost
+  </Card>
+  <Card title="Uncertain Timing" icon="question">
+    When you can't predict short-term price movements
+  </Card>
+  <Card title="Emotional Investing" icon="face-frown">
+    Removes fear/greed from the equation
+  </Card>
+</CardGroup>
+
+<Warning>
+**Lump Sum May Win in Bull Markets:** If prices consistently rise, lump sum investing can outperform DCA. However, predicting this is difficult.
+</Warning>
+
+## AI-Powered DCA Features
+
+### Natural Language Parsing
+
+The AI understands flexible command formats:
+
+```typescript
+// All these work:
+"SIP $100 in BTC every Monday"
+"Invest $100 into Bitcoin weekly on Mondays"
+"Set up $100 weekly BTC investment starting Monday"
+"Create weekly Bitcoin plan for $100"
+```
+
+### Smart Parameter Detection
+
+```typescript
+// From groqService.ts - parseDCARequest function
+export function parseDCARequest(message: string): DCARequest | null {
+  // Extract amount: $100, 100 dollars, 100 usd
+  const amountMatch = message.match(/\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:dollar|usd|\$)?/i);
+  
+  // Extract token: BTC, Bitcoin, ETH, Ethereum
+  let token = 'BTC';
+  if (/\b(btc|bitcoin)\b/i.test(message)) token = 'BTC';
+  else if (/\b(eth|ethereum)\b/i.test(message)) token = 'ETH';
+  
+  // Extract frequency: daily, weekly, monthly
+  let frequency = 'monthly';
+  if (/\b(daily|every\s+day)\b/i.test(message)) frequency = 'daily';
+  else if (/\b(weekly|every\s+week)\b/i.test(message)) frequency = 'weekly';
+  
+  // Extract start day: Monday, 1st, 15th
+  const dayMatch = message.match(/\b(monday|tuesday|...)\b/i);
+  
+  return { amount, token, frequency, duration, startDay };
+}
+```
+
+## DCA Plan Management
+
+### Current Implementation
+
+<Note>
+**Simulation Mode:** Currently, DCA plans are created and shown for review, but automated execution is not yet implemented on-chain. Users can manually execute purchases at their chosen intervals using the Trading or Swap pages.
+</Note>
+
+### Viewing Your Plans
+
+Once approved, the AI shows a confirmation message:
+
+```
+✅ DCA Plan Approved!
+
+Your investment plan has been created:
+
+| Parameter | Value |
+|-----------|-------|
+| Amount | $100 |
+| Token | BTC |
+| Frequency | Weekly (Monday) |
+| Duration | 12 months |
+
+Next Steps:
+1. Connect your wallet to execute this plan
+2. Approve the smart contract to automate investments
+3. Sit back and let DCA work its magic! 🚀
+```
+
+### Modifying Plans
+
+To change a DCA plan, create a new one with updated parameters:
+
+```
+"Update my BTC DCA to $150 weekly"
+"Change ETH plan to monthly instead of weekly"
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start Small" icon="seedling">
+    Begin with amounts you can comfortably invest long-term
+    
+    **Example:** Start with $25/week, increase to $50 after 3 months
+  </Accordion>
+
+  <Accordion title="Stay Consistent" icon="clock">
+    Don't skip periods due to price movements
+    
+    **Remember:** The goal is to average out, not time the market
+  </Accordion>
+
+  <Accordion title="Set It and Forget It" icon="robot">
+    Once set up, avoid constantly checking prices
+    
+    **Why:** Reduces emotional decision-making
+  </Accordion>
+
+  <Accordion title="Review Quarterly" icon="calendar-check">
+    Evaluate performance every 3 months, not daily
+    
+    **Adjust:** Only change if your financial situation changes
+  </Accordion>
+
+  <Accordion title="Have Emergency Funds" icon="piggy-bank">
+    Only DCA with money you won't need for 3-5 years
+    
+    **Rule:** Keep 3-6 months expenses in traditional savings
+  </Accordion>
+</AccordionGroup>
+
+## DCA Strategies by Goal
+
+### Conservative (Low Risk)
+
+**Profile:** Risk-averse, long-term wealth preservation
+
+- **Allocation:** 70% BTC / 30% ETH
+- **Amount:** $100-200/month
+- **Frequency:** Monthly
+- **Duration:** 5+ years
+
+### Balanced (Medium Risk)
+
+**Profile:** Moderate risk tolerance, growth-focused
+
+- **Allocation:** 60% BTC / 40% ETH
+- **Amount:** $200-500/month
+- **Frequency:** Weekly
+- **Duration:** 3-5 years
+
+### Aggressive (High Risk)
+
+**Profile:** High risk tolerance, maximum growth
+
+- **Allocation:** 50% BTC / 30% ETH / 20% Altcoins (SOL, ADA)
+- **Amount:** $500-1000/month
+- **Frequency:** Weekly or Daily
+- **Duration:** 3-10 years
+
+## Tax Considerations
+
+<Warning>
+**Tax Implications:** Each DCA purchase is a taxable event in most jurisdictions. Keep records of:
+- Purchase date
+- Amount spent
+- Token price at purchase
+- Transaction hash
+
+Consult a tax professional for guidance.
+</Warning>
+
+## Performance Tracking
+
+Track your DCA performance using the Portfolio page:
+
+- **Total Invested:** Sum of all purchases
+- **Current Value:** Real-time portfolio value
+- **Unrealized Gain/Loss:** Current value - Total invested
+- **Average Cost Basis:** Total invested ÷ Total tokens owned
+
+## Common Questions
+
+<AccordionGroup>
+  <Accordion title="What if prices drop after I start?" icon="circle-question">
+    **Answer:** This is ideal for DCA! You'll buy more tokens at lower prices, reducing your average cost basis.
+    
+    **Example:** If BTC drops 20%, your next $100 buys 20% more BTC than before.
+  </Accordion>
+
+  <Accordion title="Should I stop DCA during bear markets?" icon="circle-question">
+    **Answer:** No! Bear markets are when DCA shines. Continuing to invest during downturns lowers your average cost significantly.
+  </Accordion>
+
+  <Accordion title="Can I DCA multiple tokens at once?" icon="circle-question">
+    **Answer:** Yes! Create separate DCA plans for each token:
+    - "$50 weekly in BTC"
+    - "$30 weekly in ETH"
+    - "$20 weekly in SOL"
+  </Accordion>
+
+  <Accordion title="How long should I DCA?" icon="circle-question">
+    **Answer:** Minimum 12 months, ideally 3-5 years. The longer the period, the better the averaging effect.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Chat" icon="robot" href="/features/ai-chat">
+    Create your first DCA plan using AI
+  </Card>
+  <Card title="Portfolio" icon="wallet" href="/features/portfolio">
+    Track your DCA performance
+  </Card>
+  <Card title="Trading" icon="chart-candlestick" href="/features/trading">
+    Execute manual purchases
+  </Card>
+  <Card title="Swap" icon="arrows-rotate" href="/features/swap">
+    Convert between tokens
+  </Card>
+</CardGroup>

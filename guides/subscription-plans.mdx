@@ -1,0 +1,244 @@
+---
+title: 'Subscription Plans'
+description: 'Choose the right subscription plan for your trading needs on GweAI'
+---
+
+# Subscription Plans
+
+GweAI offers flexible subscription plans to suit different trading styles and commitment levels. All plans are powered by smart contracts on Base Sepolia.
+
+## Available Plans
+
+### Free Plan
+
+**Price**: Free forever
+
+**Features**:
+- Limited DCA Features
+- View Portfolio
+- Basic Analytics
+- Community Access
+
+The Free plan is perfect for exploring the platform and understanding how DCA strategies work without any financial commitment.
+
+<Tip>
+The Free plan has no expiry date, so you can take your time learning the platform.
+</Tip>
+
+### Monthly Plan
+
+**Price**: $2 USDC per month
+
+**Duration**: 30 days
+
+**Badge**: Popular
+
+**Features**:
+- Full DCA Access
+- Automated Strategies
+- Advanced Analytics
+- Portfolio Tracking
+- Priority Support
+- 30-Day Access
+
+The Monthly plan is ideal for regular traders who want full access to platform features with flexible monthly renewals.
+
+<Note>
+This is the most popular plan among active traders.
+</Note>
+
+### Yearly Plan
+
+**Price**: $20 USDC per year (Save 17%)
+
+**Original Price**: $24 USDC
+
+**Duration**: 365 days
+
+**Features**:
+- All Monthly Features
+- 365-Day Access
+- Save 17% annually
+- Extended DCA Strategies
+- Premium Analytics
+- VIP Support
+- Early Feature Access
+
+The Yearly plan offers the best value for committed users, providing significant savings and exclusive benefits.
+
+<Tip>
+Yearly subscribers save $4 compared to paying monthly and get access to premium features.
+</Tip>
+
+## Purchasing a Subscription
+
+<Steps>
+  <Step title="Connect Your Wallet">
+    Before purchasing a subscription, ensure your wallet is connected and you have sufficient USDC balance.
+    
+    <Warning>
+      You need both USDC for the subscription payment and ETH for gas fees on Base Sepolia.
+    </Warning>
+  </Step>
+
+  <Step title="Choose Your Plan">
+    Navigate to the Subscription page and review the available plans. Click "Select Plan" or "Choose Plan" on your preferred option.
+  </Step>
+
+  <Step title="Review Purchase Details">
+    A purchase modal will appear showing:
+    - Plan name and duration
+    - Total cost in USDC
+    - Your current USDC balance
+    - Estimated gas fees
+  </Step>
+
+  <Step title="Approve USDC Spending">
+    First, you'll need to approve the smart contract to spend USDC on your behalf. This is a one-time approval per plan type.
+    
+    Click "Approve" and confirm the transaction in your wallet.
+  </Step>
+
+  <Step title="Complete Purchase">
+    After approval is confirmed, the purchase transaction will automatically proceed. Confirm this second transaction to complete your subscription purchase.
+  </Step>
+
+  <Step title="Confirmation">
+    Once confirmed, your subscription will be active immediately. You'll see your subscription status and expiry date on the page.
+  </Step>
+</Steps>
+
+## Subscription Status
+
+After purchasing a subscription, you can view your current status:
+
+- **Plan Type**: Free, Monthly, or Yearly
+- **Status**: Active or Expired
+- **Expiry Date**: When your subscription ends
+- **Time Remaining**: Days, hours, and minutes until expiry
+- **Access Level**: Whether you have full platform access
+
+<Note>
+Your subscription status is updated in real-time from the blockchain, ensuring accuracy.
+</Note>
+
+## Plan Restrictions
+
+### Upgrade Policy
+
+You can upgrade from a lower plan to a higher plan at any time:
+- **Free → Monthly**: Instant upgrade
+- **Free → Yearly**: Instant upgrade
+- **Monthly → Yearly**: Instant upgrade
+
+<Tip>
+Upgrading extends your access period from the current time, so you don't lose any remaining days on your current plan.
+</Tip>
+
+### Downgrade Policy
+
+You cannot downgrade to a lower plan while your current subscription is active.
+
+<Warning>
+To switch to a lower-tier plan, wait for your current subscription to expire, then purchase the desired plan.
+</Warning>
+
+## Payment Details
+
+### Token Requirements
+
+| Requirement | Amount | Purpose |
+|-------------|--------|----------|
+| USDC Balance | Plan price (2 or 20 USDC) | Subscription payment |
+| ETH Balance | ~0.001 ETH | Gas fees for approval and purchase |
+
+### Transaction Flow
+
+The subscription purchase involves two blockchain transactions:
+
+1. **Approval Transaction**: Grants the subscription contract permission to spend your USDC
+2. **Purchase Transaction**: Transfers USDC and activates your subscription
+
+<Note>
+Both transactions require gas fees. Keep some ETH in your wallet for transaction costs.
+</Note>
+
+## Contract Integration
+
+The subscription system is built on smart contracts with the following plan types:
+
+```typescript
+enum PlanType {
+  FREE = 0,
+  MONTHLY = 1,
+  YEARLY = 2
+}
+
+// Plan durations (in seconds)
+const PLAN_DURATIONS = {
+  [PlanType.FREE]: 0,        // No expiry
+  [PlanType.MONTHLY]: 2592000, // 30 days
+  [PlanType.YEARLY]: 31536000  // 365 days
+};
+
+// Plan prices (in USDC)
+const PLAN_PRICES = {
+  [PlanType.FREE]: '0',
+  [PlanType.MONTHLY]: '2',
+  [PlanType.YEARLY]: '20'
+};
+```
+
+## Subscription Status Component
+
+Your current subscription is displayed with key information:
+
+```typescript
+<SubscriptionStatus
+  planType={PlanType.MONTHLY}
+  expiryTimestamp={1735689600}
+  hasAccess={true}
+  isExpired={false}
+  timeRemaining="25 days 14 hours 32 minutes"
+/>
+```
+
+## Auto-Renewal
+
+<Warning>
+Subscriptions do NOT auto-renew. You must manually purchase a new subscription before your current one expires to maintain uninterrupted access.
+</Warning>
+
+## Troubleshooting
+
+### Insufficient USDC Balance
+
+If you don't have enough USDC:
+1. Visit the [Deposit page](/guides/deposit-funds) to add USDC to your wallet
+2. Use the [Faucet](/guides/faucet) to get test USDC on testnet
+3. Swap other tokens for USDC using the platform's swap feature
+
+### Approval Transaction Pending
+
+If your approval transaction is taking too long:
+- Check the transaction status on [BaseScan](https://sepolia.basescan.org)
+- Ensure you have sufficient ETH for gas fees
+- Try increasing gas price if the network is congested
+
+### Purchase Failed After Approval
+
+If the purchase fails after approval succeeds:
+- You may need to retry the purchase (approval remains valid)
+- Check your USDC balance wasn't depleted
+- Verify your wallet is still connected
+
+### Cannot Downgrade
+
+If you're trying to select a lower-tier plan:
+- This is expected behavior to prevent accidental downgrades
+- Wait for your current subscription to expire
+- Then purchase the desired lower-tier plan
+
+<Note>
+For assistance with subscription issues, contact support with your wallet address and transaction hash.
+</Note>

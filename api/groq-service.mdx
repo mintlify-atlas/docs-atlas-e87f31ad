@@ -1,0 +1,410 @@
+---
+title: 'Groq Service API'
+description: 'AI-powered chat service for natural language trade parsing and conversation'
+icon: 'brain'
+---
+
+## Overview
+
+The Groq Service provides AI-powered natural language processing for cryptocurrency trading commands and investment advice. It uses OpenRouter AI (Grok-4.1-fast) to parse user commands into structured trade requests and generate intelligent responses.
+
+## Core Functions
+
+### generateAIResponse
+
+Generates AI-powered responses for general cryptocurrency advice and conversation.
+
+<ParamField path="userMessage" type="string" required>
+  The user's input message to process
+</ParamField>
+
+<ParamField path="conversationHistory" type="ChatMessage[]" default="[]">
+  Previous conversation context for contextual responses
+</ParamField>
+
+<ResponseField name="response" type="Promise<string>">
+  AI-generated response text in markdown format
+</ResponseField>
+
+#### Example Usage
+
+```typescript
+import { generateAIResponse } from './services/groqService';
+
+// Simple query
+const response = await generateAIResponse(
+  "What's the best DCA strategy for Bitcoin?"
+);
+
+// With conversation history
+const history = [
+  { role: 'user', content: 'Tell me about Bitcoin' },
+  { role: 'assistant', content: 'Bitcoin is...' }
+];
+const contextualResponse = await generateAIResponse(
+  "What about its price trends?",
+  history
+);
+```
+
+---
+
+### parseTradeRequest
+
+Parses natural language trading commands into structured trade requests using AI.
+
+<ParamField path="message" type="string" required>
+  The user's trading command (e.g., "buy $100 btc", "sell all eth")
+</ParamField>
+
+<ParamField path="lastToken" type="string" optional>
+  Last mentioned token from conversation context for contextual commands
+</ParamField>
+
+<ResponseField name="tradeRequest" type="TradeRequest | null">
+  Parsed trade request object or null if not a trade command
+</ResponseField>
+
+#### Supported Trade Types
+
+<CodeGroup>
+```typescript BuyRequest
+interface BuyRequest {
+  type: 'buy';
+  amount: number;
+  token: string;
+  slippage?: number;      // Default: 0.5%
+  isTokenAmount?: boolean; // true = token amount, false = USD
+}
+```
+
+```typescript SellRequest
+interface SellRequest {
+  type: 'sell';
+  amount: number | 'MAX';
+  token: string;
+  slippage?: number;
+  isTokenAmount?: boolean;
+}
+```
+
+```typescript SwapRequest
+interface SwapRequest {
+  type: 'swap';
+  amount: number | 'MAX';
+  fromToken: string;
+  toToken: string;
+  slippage?: number;
+  isTokenAmount?: boolean;
+}
+```
+
+```typescript VaultRequest
+interface VaultRequest {
+  type: 'vault' | 'stake';
+  action: 'stake' | 'unstake';
+  amount: number;
+  token: string;
+  duration?: number; // Default: 30 days
+}
+```
+</CodeGroup>
+
+#### Supported Tokens
+
+- **Major Cryptocurrencies**: BTC, ETH, SOL, BNB, XRP
+- **Layer 1s**: TON, AVAX, ADA, TRX
+- **Meme Coins**: DOGE
+- **Stablecoins**: USDC
+
+#### Token Aliases
+
+The parser recognizes common aliases:
+- `bitcoin`, `btc` → BTC
+- `ethereum`, `eth`, `ether` → ETH
+- `solana`, `sol` → SOL
+- `binance coin`, `bnb` → BNB
+- `ripple`, `xrp` → XRP
+- And more...
+
+#### Example Patterns
+
+<CodeGroup>
+```typescript Buy Examples
+// USD amount
+await parseTradeRequest("buy $100 btc");
+// Result: { type: 'buy', amount: 100, token: 'BTC', isTokenAmount: false }
+
+// Token amount
+await parseTradeRequest("buy 0.1 btc");
+// Result: { type: 'buy', amount: 0.1, token: 'BTC', isTokenAmount: true }
+
+// Hindi/Hinglish
+await parseTradeRequest("kharido 75$ sol");
+// Result: { type: 'buy', amount: 75, token: 'SOL', isTokenAmount: false }
+```
+
+```typescript Sell Examples
+// Sell specific amount
+await parseTradeRequest("sell 0.5 btc");
+// Result: { type: 'sell', amount: 0.5, token: 'BTC', isTokenAmount: true }
+
+// Sell all holdings
+await parseTradeRequest("sell all eth");
+// Result: { type: 'sell', amount: 'MAX', token: 'ETH' }
+
+// Sell USD value
+await parseTradeRequest("sell 100$ eth");
+// Result: { type: 'sell', amount: 100, token: 'ETH', isTokenAmount: false }
+```
+
+```typescript Swap Examples
+// Token amount swap
+await parseTradeRequest("swap 0.5 sol to bnb");
+// Result: { type: 'swap', amount: 0.5, fromToken: 'SOL', toToken: 'BNB', isTokenAmount: true }
+
+// USD value swap
+await parseTradeRequest("swap 100$ btc to sol");
+// Result: { type: 'swap', amount: 100, fromToken: 'BTC', toToken: 'SOL', isTokenAmount: false }
+
+// Natural language (disguised as sell)
+await parseTradeRequest("sell 100$ btc in ada");
+// Result: { type: 'swap', amount: 100, fromToken: 'BTC', toToken: 'ADA', isTokenAmount: false }
+```
+
+```typescript Contextual Commands
+// After asking "how much btc do I have?"
+await parseTradeRequest("sell these", "BTC");
+// Result: { type: 'sell', amount: 'MAX', token: 'BTC' }
+
+// Context-aware swap
+await parseTradeRequest("swap that to ada", "SOL");
+// Result: { type: 'swap', amount: 'MAX', fromToken: 'SOL', toToken: 'ADA' }
+```
+</CodeGroup>
+
+#### Usage in DCAPage.tsx
+
+```typescript DCAPage.tsx (Line 541-617)
+// Check for trade commands
+const tradeRequest = await parseTradeRequest(userInput, lastMentionedToken || undefined);
+
+if (tradeRequest) {
+  // Convert MAX to actual balance
+  if (typeof tradeRequest.amount === 'string' && tradeRequest.amount === 'MAX') {
+    const balanceMap = {
+      'BTC': btcBalance || '0',
+      'ETH': ethBalance || '0',
+      'SOL': solBalance || '0',
+      // ... other tokens
+    };
+    
+    let tokenToCheck = '';
+    if (tradeRequest.type === 'buy') tokenToCheck = 'USDC';
+    else if (tradeRequest.type === 'sell') tokenToCheck = tradeRequest.token;
+    else if (tradeRequest.type === 'swap') tokenToCheck = tradeRequest.fromToken;
+    
+    const actualBalance = parseFloat(balanceMap[tokenToCheck]);
+    if (actualBalance > 0) {
+      tradeRequest.amount = actualBalance;
+    }
+  }
+  
+  // Create trade confirmation card
+  const tradeCardMessage = {
+    id: generateChatId(),
+    text: `I've created a ${tradeRequest.type} order based on your request.`,
+    sender: 'ai',
+    type: 'trade-card',
+    tradeParams: tradeRequest
+  };
+  
+  setMessages(prev => [...prev, tradeCardMessage]);
+}
+```
+
+---
+
+### parseDCARequest
+
+Parses natural language DCA/SIP investment plan requests.
+
+<ParamField path="message" type="string" required>
+  User message containing DCA/SIP plan details
+</ParamField>
+
+<ResponseField name="dcaRequest" type="DCARequest | null">
+  Parsed DCA parameters or null if not a DCA request
+</ResponseField>
+
+#### DCARequest Interface
+
+```typescript
+interface DCARequest {
+  amount: number;      // USD amount per interval
+  token: string;       // BTC, ETH, or SOL
+  frequency: 'daily' | 'weekly' | 'monthly';
+  duration: number;    // Duration in months
+  startDay?: string;   // e.g., "Monday", "1st", "15th"
+}
+```
+
+#### Example Patterns
+
+<CodeGroup>
+```typescript Weekly DCA
+await parseDCARequest("DCA $100 in BTC every Monday for 6 months");
+// Result:
+// {
+//   amount: 100,
+//   token: 'BTC',
+//   frequency: 'weekly',
+//   duration: 6,
+//   startDay: 'Monday'
+// }
+```
+
+```typescript Monthly SIP
+await parseDCARequest("Set up SIP for $200 in ETH monthly on the 1st");
+// Result:
+// {
+//   amount: 200,
+//   token: 'ETH',
+//   frequency: 'monthly',
+//   duration: 6,
+//   startDay: '1st'
+// }
+```
+
+```typescript Daily Investment
+await parseDCARequest("Invest $50 daily in Solana for 3 months");
+// Result:
+// {
+//   amount: 50,
+//   token: 'SOL',
+//   frequency: 'daily',
+//   duration: 3
+// }
+```
+</CodeGroup>
+
+#### Usage Example
+
+```typescript DCAPage.tsx (Line 619-638)
+const dcaRequest = parseDCARequest(userInput);
+
+if (dcaRequest) {
+  setTimeout(() => {
+    const dcaCardMessage = {
+      id: generateChatId(),
+      text: 'I\'ve created a DCA plan based on your request.',
+      sender: 'ai',
+      timestamp: new Date(),
+      type: 'dca-card',
+      dcaParams: dcaRequest
+    };
+    
+    setMessages(prev => [...prev, dcaCardMessage]);
+    addMessageToConversation(chatId, dcaCardMessage, address);
+    setIsTyping(false);
+  }, 1500);
+  
+  return;
+}
+```
+
+---
+
+## Type Definitions
+
+### ChatMessage
+
+```typescript
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+```
+
+### TradeRequest Union Type
+
+```typescript
+type TradeRequest = 
+  | BuyRequest 
+  | SellRequest 
+  | SwapRequest 
+  | VaultRequest 
+  | null;
+```
+
+---
+
+## AI Training Data
+
+The trade parser is trained on **614,097 real-world examples** with:
+
+- **Portfolio queries**: 1,497 variations
+- **Buy commands**: 56,940 variations
+- **Sell commands**: 32,940 variations
+- **Swap commands**: 522,720 variations
+- **Target accuracy**: 99.5%
+
+---
+
+## Error Handling
+
+All functions include fallback mechanisms:
+
+```typescript
+try {
+  const tradeRequest = await parseTradeRequest("buy btc");
+  if (!tradeRequest) {
+    console.log('Not a trade command');
+  }
+} catch (error) {
+  console.error('AI parsing error:', error);
+  // Falls back to regex-based parser
+}
+```
+
+---
+
+## Best Practices
+
+<Card title="Context Awareness" icon="lightbulb">
+  Always pass `lastToken` parameter when using `parseTradeRequest` for contextual commands like "sell these" or "buy more".
+</Card>
+
+<Card title="Balance Validation" icon="shield-check">
+  Always validate user balances before executing MAX orders. The parser returns 'MAX' as a string that needs conversion to actual balance.
+</Card>
+
+<Card title="Conversation History" icon="clock-rotate-left">
+  Maintain conversation history for better AI responses. The AI uses context to provide more relevant answers.
+</Card>
+
+<Card title="Slippage Defaults" icon="percent">
+  All trade requests default to 0.5% slippage. Adjust based on market conditions and user preferences.
+</Card>
+
+---
+
+## Language Support
+
+- **English**: buy, sell, swap, stake
+- **Hindi/Hinglish**: kharido, becho, badlo, jama, nikalo
+
+---
+
+## API Configuration
+
+```typescript
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL = 'x-ai/grok-4.1-fast:free';
+const SITE_URL = 'https://gweai.com';
+const SITE_NAME = 'GweAI';
+```
+
+<Warning>
+  Requires `VITE_OPENAI_API_KEY` environment variable for OpenRouter API access.
+</Warning>

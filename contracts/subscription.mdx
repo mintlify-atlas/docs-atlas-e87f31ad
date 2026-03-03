@@ -1,0 +1,449 @@
+---
+title: Subscription Contract
+description: Manages user subscription plans with USDC payments and time-based access control
+---
+
+## Overview
+
+The Subscription contract handles user subscription plans for accessing premium DCA (Dollar-Cost Averaging) features on GweAI. Plans are purchased with USDC and grant time-based access.
+
+**Contract Address:** `0xcFbdEaba321700A9C125b41dB6bBd6BBBA752287`
+
+**Verification:** [View on BaseScan](https://sepolia.basescan.org/address/0xcFbdEaba321700A9C125b41dB6bBd6BBBA752287)
+
+## Subscription Plans
+
+| Plan | Price | Duration | Features |
+|------|-------|----------|----------|
+| Free | $0 | Forever | Basic trading |
+| Monthly | $2 USDC | 30 days | DCA strategies, analytics |
+| Yearly | $20 USDC | 365 days | DCA strategies, analytics, priority support |
+
+## Plan Type Enum
+
+```solidity
+enum PlanType {
+  FREE,     // 0
+  MONTHLY,  // 1
+  YEARLY    // 2
+}
+```
+
+## Key Features
+
+- USDC-based payments (6 decimals)
+- Automatic expiry tracking
+- Access control for DCA features
+- Owner delegation system
+- Plan upgrade/downgrade support
+- Treasury payment routing
+
+## Main Functions
+
+### purchasePlan
+
+Purchase or upgrade a subscription plan.
+
+<ParamField path="planType" type="uint8" required>
+  The plan to purchase: 0 (FREE), 1 (MONTHLY), or 2 (YEARLY)
+</ParamField>
+
+**Function Signature:** `0x98693010`
+
+**Process:**
+1. User approves USDC spending to subscription contract
+2. User calls `purchasePlan(1)` for Monthly or `purchasePlan(2)` for Yearly
+3. Contract transfers USDC from user to treasury
+4. Contract updates user's subscription and expiry timestamp
+5. `PlanPurchased` event is emitted
+
+<Warning>
+You must approve the subscription contract to spend USDC before calling `purchasePlan`. The frontend handles this automatically.
+</Warning>
+
+### getSubscription
+
+Get subscription details for a user.
+
+<ParamField path="user" type="address" required>
+  Address of the user to query
+</ParamField>
+
+**Returns:**
+- `planType` (uint8) - Current plan type
+- `expiryTimestamp` (uint256) - Unix timestamp when plan expires
+- `hasAccess` (boolean) - Whether user currently has access
+- `isExpired` (boolean) - Whether the plan has expired
+
+### checkAccess
+
+Check if a user has active subscription access.
+
+<ParamField path="user" type="address" required>
+  Address of the user to check
+</ParamField>
+
+**Returns:**
+- `hasAccess` (boolean) - True if user has valid subscription
+
+### getPlanDetails
+
+Get pricing and duration for a plan type.
+
+<ParamField path="planType" type="uint8" required>
+  Plan type to query (0, 1, or 2)
+</ParamField>
+
+**Returns:**
+- `price` (uint256) - Price in USDC (6 decimals)
+- `duration` (uint256) - Duration in seconds
+- `isActive` (boolean) - Whether plan is currently available
+
+## Integration Example
+
+Purchasing a subscription from the frontend:
+
+```typescript
+import { 
+  purchaseSubscription, 
+  getUserSubscription, 
+  PlanType 
+} from '@/services/contractService';
+import { parseUnits } from 'viem';
+
+const SUBSCRIPTION_ADDRESS = '0xcFbdEaba321700A9C125b41dB6bBd6BBBA752287';
+const USDC_ADDRESS = '0xBEE08798a3634e29F47e3d277C9d11507D55F66a';
+
+// Step 1: Check current subscription
+const subscription = await getUserSubscription(userAddress, publicClient);
+console.log('Current plan:', subscription.planType); // 0, 1, or 2
+console.log('Has access:', subscription.hasAccess);
+console.log('Expires:', new Date(Number(subscription.expiryTimestamp) * 1000));
+
+// Step 2: Purchase Monthly plan
+const planPrice = parseUnits('2', 6); // $2 USDC
+
+// Approve USDC
+const approveHash = await walletClient.writeContract({
+  address: USDC_ADDRESS,
+  abi: ERC20_ABI,
+  functionName: 'approve',
+  args: [SUBSCRIPTION_ADDRESS, planPrice],
+});
+
+console.log('Approval tx:', approveHash);
+
+// Wait for approval confirmation
+await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+// Purchase plan
+const purchaseHash = await walletClient.writeContract({
+  address: SUBSCRIPTION_ADDRESS,
+  abi: SUBSCRIPTION_PLAN_ABI,
+  functionName: 'purchasePlan',
+  args: [PlanType.MONTHLY], // 1 for Monthly
+});
+
+console.log('Purchase tx:', purchaseHash);
+
+// Step 3: Verify purchase
+const updatedSubscription = await getUserSubscription(userAddress, publicClient);
+console.log('New plan:', updatedSubscription.planType);
+console.log('New expiry:', new Date(Number(updatedSubscription.expiryTimestamp) * 1000));
+```
+
+## Full Purchase Flow
+
+Here's the complete implementation from `contractService.ts`:
+
+```typescript
+export const purchaseSubscription = async (
+  planType: PlanType,
+  walletClient: WalletClient
+): Promise<any> => {
+  // Plan prices (USDC has 6 decimals)
+  const prices: Record<PlanType, bigint> = {
+    [PlanType.FREE]: BigInt(0),
+    [PlanType.MONTHLY]: BigInt(2_000000), // $2
+    [PlanType.YEARLY]: BigInt(20_000000), // $20
+  };
+  
+  const price = prices[planType];
+  
+  console.log('[contractService] Approving USDC:', price.toString());
+  
+  // Step 1: Approve USDC spending
+  const approveHash = await walletClient.writeContract({
+    address: USDC_TOKEN_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'approve',
+    args: [SUBSCRIPTION_CONTRACT_ADDRESS, price],
+    account: walletClient.account!,
+    chain: walletClient.chain,
+  });
+  
+  console.log('[contractService] Approve tx hash:', approveHash);
+  
+  // Wait for approval to be mined
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  console.log('[contractService] Purchasing plan:', planType);
+  
+  // Step 2: Purchase the plan
+  const purchaseHash = await walletClient.writeContract({
+    address: SUBSCRIPTION_CONTRACT_ADDRESS,
+    abi: SUBSCRIPTION_PLAN_ABI,
+    functionName: 'purchasePlan',
+    args: [planType],
+    account: walletClient.account!,
+    chain: walletClient.chain,
+  });
+  
+  console.log('[contractService] Purchase tx hash:', purchaseHash);
+  
+  return { 
+    hash: purchaseHash,
+    wait: async () => ({ hash: purchaseHash })
+  };
+};
+```
+
+## Checking Access
+
+Validate subscription access before allowing DCA features:
+
+```typescript
+import { checkUserAccess } from '@/services/contractService';
+
+const hasAccess = await checkUserAccess(userAddress, provider);
+
+if (!hasAccess) {
+  // Show upgrade prompt
+  console.log('User needs to upgrade to access DCA features');
+  // Redirect to subscription page
+} else {
+  // Allow access to premium features
+  console.log('User has valid subscription');
+}
+```
+
+## Subscription Data Structure
+
+```solidity
+struct Subscription {
+  PlanType planType;        // Current plan (FREE, MONTHLY, YEARLY)
+  uint256 expiryTimestamp;  // When subscription expires
+  bool hasLifetimeAccess;   // Reserved for future use
+  address owner;            // Can delegate to another address
+}
+```
+
+## Owner Delegation
+
+Users can delegate their subscription to another address:
+
+### setOwner
+
+<ParamField path="owner" type="address" required>
+  Address to delegate subscription access to
+</ParamField>
+
+Useful for sharing subscriptions or managing multiple wallets.
+
+### getOwner
+
+<ParamField path="user" type="address" required>
+  Address to query owner for
+</ParamField>
+
+**Returns:**
+- `owner` (address) - The delegated owner address (or user's own address)
+
+## Admin Functions
+
+### revokeExpiredAccess
+
+Manually revoke access for an expired subscription:
+
+```solidity
+function revokeExpiredAccess(address user) external;
+```
+
+Used to clean up expired subscriptions. Access is automatically checked, but this allows explicit revocation.
+
+## Contract Events
+
+### PlanPurchased
+
+Emitted when a user purchases a plan:
+
+```solidity
+event PlanPurchased(
+  address indexed user,
+  PlanType planType,
+  uint256 expiryTimestamp
+);
+```
+
+### PlanExpired
+
+Emitted when a subscription expires:
+
+```solidity
+event PlanExpired(
+  address indexed user,
+  PlanType previousPlan
+);
+```
+
+### OwnerSet
+
+Emitted when delegation is set:
+
+```solidity
+event OwnerSet(
+  address indexed user,
+  address indexed owner
+);
+```
+
+### AccessRevoked
+
+Emitted when access is explicitly revoked:
+
+```solidity
+event AccessRevoked(
+  address indexed user
+);
+```
+
+### TreasuryUpdated
+
+Emitted when treasury address changes:
+
+```solidity
+event TreasuryUpdated(
+  address indexed newTreasury
+);
+```
+
+## USDC Token
+
+Subscriptions are paid with USDC on Base Sepolia:
+
+**USDC Contract:** `0xBEE08798a3634e29F47e3d277C9d11507D55F66a`
+
+**Decimals:** 6
+
+**Format:** $2.00 = 2,000,000 (2 * 10^6)
+
+```typescript
+import { parseUnits, formatUnits } from 'ethers';
+
+// Parse human-readable amount
+const amount = parseUnits('2', 6); // 2 USDC
+console.log(amount); // 2000000n
+
+// Format to human-readable
+const formatted = formatUnits(2000000n, 6);
+console.log(formatted); // "2.0"
+```
+
+## Checking USDC Balance
+
+Before purchasing, verify user has sufficient USDC:
+
+```typescript
+import { getUSDCBalance } from '@/services/contractService';
+
+const balance = await getUSDCBalance(userAddress, publicClient);
+console.log('USDC Balance:', formatUnits(balance, 6));
+
+if (balance < parseUnits('2', 6)) {
+  console.log('Insufficient USDC balance');
+  // Show error or faucet link
+}
+```
+
+## Plan Utilities
+
+Helper functions for working with plans:
+
+```typescript
+import { 
+  getPlanName, 
+  formatExpiryDate, 
+  getTimeRemaining 
+} from '@/services/contractService';
+
+// Get plan name
+const name = getPlanName(PlanType.MONTHLY);
+console.log(name); // "Monthly"
+
+// Format expiry date
+const expiryDate = formatExpiryDate(1735689600n);
+console.log(expiryDate); // "January 1, 2025"
+
+// Get time remaining
+const remaining = getTimeRemaining(1735689600n);
+console.log(remaining); // "45 days remaining"
+```
+
+## Security Considerations
+
+<Warning>
+**Important Security Notes:**
+
+1. Always approve exact amounts or use maximum uint256 for convenience
+2. Verify USDC token address matches the whitelisted address
+3. Check subscription expiry before allowing access to premium features
+4. Contract address is immutable in codebase to prevent frontend manipulation
+5. All payments go directly to verified treasury address
+</Warning>
+
+## Treasury Address
+
+All subscription payments are sent to:
+
+```
+0x39c0b97A8F2194fcd7396296F7697a84dd81077A
+```
+
+This is the same treasury that receives:
+- Protocol fees from swaps
+- Early withdrawal penalties from vault staking
+
+## Error Handling
+
+Common errors and solutions:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Insufficient USDC balance" | User lacks USDC | Get USDC from faucet or DEX |
+| "Approval failed" | Transaction rejected | Check wallet connection |
+| "Invalid plan type" | Plan type > 2 | Use 0 (FREE), 1 (MONTHLY), or 2 (YEARLY) |
+| "USDC contract has no code" | Wrong network | Switch to Base Sepolia (84532) |
+
+## Testing
+
+To test subscription functionality:
+
+```bash
+# Get test USDC from Base Sepolia faucet
+# USDC: 0xBEE08798a3634e29F47e3d277C9d11507D55F66a
+
+# Run subscription tests
+npm run test:subscription
+```
+
+## Related Contracts
+
+<CardGroup cols={2}>
+  <Card title="Contract Overview" icon="list" href="/contracts/overview">
+    View all contract addresses and tokens
+  </Card>
+  
+  <Card title="Router Contract" icon="arrows-rotate" href="/contracts/router">
+    Swap tokens to get USDC for subscriptions
+  </Card>
+</CardGroup>

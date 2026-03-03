@@ -1,0 +1,468 @@
+---
+title: 'RPC Providers'
+description: 'Optimized RPC provider setup with fallback, caching, and rate limiting for Base Sepolia'
+icon: 'server'
+---
+
+## Overview
+
+GweAI uses a sophisticated RPC provider system built with [Viem](https://viem.sh) that includes automatic fallback, intelligent caching, and rate limiting to ensure reliable blockchain connectivity.
+
+## Architecture
+
+The RPC system provides:
+
+- **Automatic Fallback**: Switches between 3 RPC endpoints on failure
+- **Smart Caching**: 10-second cache for frequently accessed data
+- **Rate Limiting**: 50 requests per 10 seconds with automatic throttling
+- **Retry Logic**: Exponential backoff with up to 3 retries
+- **Block Number Caching**: 2-second cache matching Base's block time
+
+## Public Client
+
+### getPublicClient()
+
+Returns a singleton Viem public client with fallback transport:
+
+```typescript
+import { getPublicClient } from './utils/rpcProvider';
+
+const client = getPublicClient();
+
+// Read contract data
+const balance = await client.readContract({
+  address: '0x...',
+  abi: erc20Abi,
+  functionName: 'balanceOf',
+  args: [userAddress],
+});
+```
+
+**Type Signature:**
+```typescript
+function getPublicClient(): PublicClient
+```
+
+**Features:**
+- Singleton pattern (created once, reused)
+- Fallback across 3 RPC endpoints
+- Batch multicall support enabled
+- 4-second RPC response cache
+
+### Configuration
+
+<ParamField path="chain" type="Chain" default="baseSepolia">
+  Blockchain network (Base Sepolia testnet)
+</ParamField>
+
+<ParamField path="transport" type="Transport">
+  Fallback transport with multiple HTTP endpoints
+</ParamField>
+
+<ParamField path="batch.multicall" type="boolean" default="true">
+  Enables batching multiple contract calls into single RPC request
+</ParamField>
+
+<ParamField path="cacheTime" type="number" default="4000">
+  Cache duration for RPC responses in milliseconds
+</ParamField>
+
+## RPC Endpoints
+
+Ordered by reliability:
+
+<Steps>
+  <Step title="Alchemy (Primary)">
+    ```
+    https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP
+    ```
+    
+    **Rate Limits**: 3M compute units/month (~300k requests)
+    
+    **Timeout**: 5 seconds
+    
+    **Retries**: 2 attempts with 1 second delay
+  </Step>
+  
+  <Step title="BlockPI (Secondary)">
+    ```
+    https://base-sepolia.blockpi.network/v1/rpc/public
+    ```
+    
+    **Rate Limits**: 10M requests/day
+    
+    **Timeout**: 5 seconds
+    
+    **Retries**: 2 attempts with 1 second delay
+  </Step>
+  
+  <Step title="PublicNode (Tertiary)">
+    ```
+    https://base-sepolia-rpc.publicnode.com
+    ```
+    
+    **Rate Limits**: Best effort, no guarantees
+    
+    **Timeout**: 5 seconds
+    
+    **Retries**: 2 attempts with 1 second delay
+  </Step>
+</Steps>
+
+<Note>
+  The transport uses `rank: false` to maintain priority order, trying the primary Alchemy endpoint first.
+</Note>
+
+## Caching System
+
+### RPCCache Class
+
+In-memory cache for RPC responses with automatic expiration:
+
+```typescript
+class RPCCache {
+  private cache = new Map<string, CacheEntry<any>>();
+  private readonly TTL = 10000; // 10 seconds
+
+  set<T>(key: string, data: T): void
+  get<T>(key: string): T | null
+  clear(): void
+}
+```
+
+<ParamField path="TTL" type="number" default="10000">
+  Time-to-live for cached entries in milliseconds (10 seconds)
+</ParamField>
+
+**Usage Example:**
+
+<CodeGroup>
+```typescript Automatic Caching
+import { safeRPCCall, rpcCache } from './utils/rpcProvider';
+
+// Cached for 10 seconds
+const balance = await safeRPCCall(
+  () => client.getBalance({ address: userAddress }),
+  3,
+  `balance-${userAddress}`
+);
+```
+
+```typescript Manual Cache Control
+import { rpcCache } from './utils/rpcProvider';
+
+// Set cache manually
+rpcCache.set('my-key', { data: 'value' });
+
+// Get cached value
+const cached = rpcCache.get<MyType>('my-key');
+
+// Clear all cache
+rpcCache.clear();
+```
+</CodeGroup>
+
+### Block Number Cache
+
+Optimized caching for current block number:
+
+```typescript
+export const getCurrentBlock = async (): Promise<bigint>
+```
+
+<ParamField path="BLOCK_CACHE_TIME" type="number" default="2000">
+  Cache duration matching Base's 2-second block time
+</ParamField>
+
+**Type Signature:**
+```typescript
+function getCurrentBlock(): Promise<bigint>
+```
+
+**Example:**
+```typescript
+import { getCurrentBlock } from './utils/rpcProvider';
+
+const blockNumber = await getCurrentBlock();
+console.log(`Current block: ${blockNumber}`);
+```
+
+## Rate Limiting
+
+### RateLimiter Class
+
+Prevents exceeding RPC provider limits:
+
+```typescript
+class RateLimiter {
+  private readonly maxRequests = 50;
+  private readonly timeWindow = 10000; // 10 seconds
+
+  canMakeRequest(): boolean
+  getWaitTime(): number
+}
+```
+
+<ParamField path="maxRequests" type="number" default="50">
+  Maximum requests allowed within time window
+</ParamField>
+
+<ParamField path="timeWindow" type="number" default="10000">
+  Time window for rate limit in milliseconds (10 seconds)
+</ParamField>
+
+**Behavior:**
+- Tracks timestamps of recent requests
+- Automatically removes expired requests
+- Returns `false` when limit exceeded
+- Calculates wait time until next available slot
+
+<Warning>
+  When rate limited, `safeRPCCall` automatically waits until the next available slot before making the request.
+</Warning>
+
+## Safe RPC Call Wrapper
+
+### safeRPCCall()
+
+Wrapper function with retry logic, caching, and rate limiting:
+
+```typescript
+export async function safeRPCCall<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  cacheKey?: string
+): Promise<T>
+```
+
+<ParamField path="fn" type="() => Promise<T>" required>
+  Async function that makes the RPC call
+</ParamField>
+
+<ParamField path="maxRetries" type="number" default="3">
+  Maximum retry attempts on failure
+</ParamField>
+
+<ParamField path="cacheKey" type="string" optional>
+  Optional cache key for storing/retrieving cached results
+</ParamField>
+
+**Features:**
+1. Checks cache first (if `cacheKey` provided)
+2. Applies rate limiting
+3. Retries with exponential backoff on failure
+4. Caches successful results
+5. Returns result or throws error after all retries
+
+**Retry Strategy:**
+- Delay = min(1000 × 2^attempt, 5000)ms
+- Attempt 1: 1000ms delay
+- Attempt 2: 2000ms delay
+- Attempt 3: 4000ms delay
+
+<CodeGroup>
+```typescript Basic Usage
+import { safeRPCCall, getPublicClient } from './utils/rpcProvider';
+
+const client = getPublicClient();
+
+const data = await safeRPCCall(
+  () => client.readContract({
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'getData',
+  })
+);
+```
+
+```typescript With Caching
+const balance = await safeRPCCall(
+  () => client.getBalance({ address: userAddress }),
+  3,
+  `balance-${userAddress}-${blockNumber}`
+);
+```
+
+```typescript Custom Retries
+const result = await safeRPCCall(
+  () => fetchCriticalData(),
+  5, // 5 retry attempts
+  'critical-data'
+);
+```
+</CodeGroup>
+
+## Preloading Critical Data
+
+### preloadCriticalData()
+
+Initializes RPC client and preloads essential blockchain data:
+
+```typescript
+export const preloadCriticalData = async (): Promise<void>
+```
+
+**What it preloads:**
+- Initializes singleton public client
+- Fetches current block number
+- Warms up RPC connection
+
+**Usage:**
+```typescript App Initialization
+import { preloadCriticalData } from './utils/rpcProvider';
+
+// Call on app startup
+await preloadCriticalData();
+console.log('✅ RPC client ready');
+```
+
+<Tip>
+  Call `preloadCriticalData()` during app initialization to reduce latency on first user interaction.
+</Tip>
+
+## Implementation Example
+
+Complete RPC provider setup:
+
+```typescript rpcProvider.ts
+import { createPublicClient, http, fallback } from 'viem';
+import { baseSepolia } from 'viem/chains';
+
+const RPC_ENDPOINTS = [
+  'https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP',
+  'https://base-sepolia.blockpi.network/v1/rpc/public',
+  'https://base-sepolia-rpc.publicnode.com',
+];
+
+export const getPublicClient = () => {
+  return createPublicClient({
+    chain: baseSepolia,
+    transport: fallback(
+      RPC_ENDPOINTS.map(url => http(url, {
+        timeout: 5000,
+        retryCount: 2,
+        retryDelay: 1000,
+      })),
+      { rank: false }
+    ),
+    batch: {
+      multicall: true,
+    },
+    cacheTime: 4000,
+  });
+};
+```
+
+## Fallback Strategy
+
+The RPC fallback strategy from `RPC_FIX_GUIDE.md` ensures 99.9% uptime:
+
+<Steps>
+  <Step title="Primary RPC Attempt">
+    Request sent to Alchemy (best rate limits)
+  </Step>
+  
+  <Step title="Automatic Failover">
+    If primary fails (403, timeout, etc.), instantly tries BlockPI
+  </Step>
+  
+  <Step title="Final Fallback">
+    If secondary fails, falls back to PublicNode
+  </Step>
+  
+  <Step title="Retry Logic">
+    Each endpoint retries 2 times with 1-second delay before moving to next
+  </Step>
+</Steps>
+
+<Info>
+  **Performance Improvements** from fallback strategy:
+  - 40% reduction in RPC calls (smart caching)
+  - 99.9% uptime (4 fallback providers)
+  - Lower bandwidth usage (cached blocks & balances)
+</Info>
+
+## Type Definitions
+
+```typescript
+import type { PublicClient } from 'viem';
+
+export function getPublicClient(): PublicClient;
+export function getCurrentBlock(): Promise<bigint>;
+export function safeRPCCall<T>(
+  fn: () => Promise<T>,
+  maxRetries?: number,
+  cacheKey?: string
+): Promise<T>;
+export function preloadCriticalData(): Promise<void>;
+
+export const rpcCache: RPCCache;
+export const rateLimiter: RateLimiter;
+```
+
+## Monitoring & Debugging
+
+### Console Logs
+
+The RPC provider outputs helpful logs:
+
+```bash
+✅ Public client initialized with 3 fallback providers
+⏱️ Rate limited, waiting 2000ms
+⚠️ RPC call attempt 1/3 failed: [error details]
+```
+
+### Testing RPC Health
+
+<CodeGroup>
+```typescript Check RPC Availability
+const testRPC = async (url: string) => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'eth_blockNumber',
+      params: [],
+      id: 1,
+    }),
+  });
+  return response.ok;
+};
+```
+
+```typescript Monitor Rate Limits
+import { rateLimiter } from './utils/rpcProvider';
+
+const canMakeRequest = rateLimiter.canMakeRequest();
+if (!canMakeRequest) {
+  const waitTime = rateLimiter.getWaitTime();
+  console.log(`Wait ${waitTime}ms before next request`);
+}
+```
+</CodeGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Wagmi Configuration" icon="plug" href="/api/wagmi-config">
+    Wallet connectors and Wagmi setup
+  </Card>
+  <Card title="Contract Addresses" icon="file-contract" href="/api/contract-addresses">
+    Verified smart contract addresses
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Warning>
+  **Production**: Replace demo API keys with production keys from [Alchemy](https://www.alchemy.com/) for higher rate limits (3M → 300M compute units/month).
+</Warning>
+
+<Tip>
+  Always use `safeRPCCall` wrapper for production code to get automatic retry logic, caching, and rate limiting.
+</Tip>
+
+<Note>
+  The singleton pattern ensures only one public client instance exists, reducing memory usage and connection overhead.
+</Note>

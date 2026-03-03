@@ -1,0 +1,714 @@
+---
+title: Wallet Connection
+description: Complete guide to connecting your wallet to GweAI using Dynamic's advanced authentication system
+---
+
+# Wallet Connection Guide
+
+GweAI uses [Dynamic](https://www.dynamic.xyz/) for advanced wallet authentication, providing seamless multi-wallet support with account abstraction capabilities.
+
+## Overview
+
+Dynamic enables:
+- **Multiple wallet connectors** (MetaMask, Coinbase, WalletConnect)
+- **Email/social authentication** (no wallet required)
+- **Account abstraction** (gasless transactions)
+- **Multi-chain support** (Base Sepolia, BSC Testnet)
+- **Session management** (persistent authentication)
+
+<Note>
+  **No Wallet? No Problem!** Dynamic allows you to create a smart contract wallet using just your email or social accounts.
+</Note>
+
+## Supported Wallets
+
+GweAI supports all major Ethereum-compatible wallets:
+
+<CardGroup cols={3}>
+  <Card title="MetaMask" icon="fox">
+    Most popular browser extension wallet with extensive dApp support
+  </Card>
+  
+  <Card title="Coinbase Wallet" icon="coin">
+    Integrated Coinbase smart wallet with seamless authentication
+  </Card>
+  
+  <Card title="WalletConnect" icon="mobile">
+    Connect any mobile wallet via QR code (Trust Wallet, Rainbow, etc.)
+  </Card>
+  
+  <Card title="Brave Wallet" icon="shield">
+    Built-in wallet for Brave browser users
+  </Card>
+  
+  <Card title="Embedded Wallet" icon="envelope">
+    Create wallet with email - no extension needed
+  </Card>
+  
+  <Card title="Social Login" icon="users">
+    Authenticate with Google, Twitter, Discord
+  </Card>
+</CardGroup>
+
+## Installation & Setup
+
+### Install Dependencies
+
+GweAI uses these Dynamic packages:
+
+```bash
+npm install @dynamic-labs/sdk-react-core \
+            @dynamic-labs/ethereum \
+            @dynamic-labs/wallet-connector-core
+```
+
+**Versions used:**
+```json
+{
+  "@dynamic-labs/sdk-react-core": "^4.45.1",
+  "@dynamic-labs/ethereum": "^4.45.1",
+  "@dynamic-labs/wallet-connector-core": "^4.45.1"
+}
+```
+
+### Environment Configuration
+
+Set up your Dynamic environment ID:
+
+```bash
+# .env
+VITE_DYNAMIC_ENVIRONMENT_ID=your_dynamic_environment_id
+```
+
+<Steps>
+
+### Get Your Dynamic Environment ID
+
+1. Sign up at [Dynamic Dashboard](https://app.dynamic.xyz/)
+2. Create a new project
+3. Copy your Environment ID from the dashboard
+4. Add it to your `.env` file
+
+### Configure Networks
+
+Dynamic needs to know which networks your app supports (Base Sepolia, BSC Testnet, etc.)
+
+</Steps>
+
+## Dynamic Provider Setup
+
+Here's how GweAI configures Dynamic in `main.tsx`:
+
+```typescript
+import ReactDOM from 'react-dom/client'
+import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
+import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App.tsx'
+
+const queryClient = new QueryClient();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <DynamicContextProvider
+    settings={{
+      environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID,
+      walletConnectors: [EthereumWalletConnectors],
+      
+      // Use connect-and-sign for authentication support
+      initialAuthenticationMode: 'connect-and-sign',
+      
+      // Recommended wallets configuration
+      recommendedWallets: [
+        { walletKey: 'metamask' },
+        { walletKey: 'coinbase' },
+        { walletKey: 'walletconnect' },
+      ],
+      
+      // Privacy settings for faster load
+      privacyPolicyUrl: undefined,
+      termsOfServiceUrl: undefined,
+      
+      // Network overrides - completely override default networks
+      overrides: {
+        evmNetworks: () => [
+          // Base Sepolia
+          {
+            blockExplorerUrls: ['https://sepolia.basescan.org'],
+            chainId: 84532,
+            chainName: 'Base Sepolia',
+            iconUrls: ['https://avatars.githubusercontent.com/u/108554348?s=280&v=4'],
+            name: 'Base Sepolia Testnet',
+            nativeCurrency: {
+              decimals: 18,
+              name: 'ETH',
+              symbol: 'ETH',
+            },
+            networkId: 84532,
+            rpcUrls: ['https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP'],
+            vanityName: 'Base Sepolia',
+          },
+          // BNB Smart Chain Testnet
+          {
+            blockExplorerUrls: ['https://testnet.bscscan.com'],
+            chainId: 97,
+            chainName: 'BSC Testnet',
+            iconUrls: ['https://s2.coinmarketcap.com/static/img/coins/64x64/1839.png'],
+            name: 'Binance Smart Chain Testnet',
+            nativeCurrency: {
+              decimals: 18,
+              name: 'tBNB',
+              symbol: 'tBNB',
+            },
+            networkId: 97,
+            rpcUrls: [
+              'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+              'https://bsc-testnet.publicnode.com'
+            ],
+            vanityName: 'BSC Testnet',
+          },
+        ],
+      },
+      
+      // Event listeners for wallet actions
+      events: {
+        onAuthSuccess: (args) => {
+          // Store user ID for session management
+          if (args.user?.userId) {
+            localStorage.setItem('dynamic_user_id', args.user.userId);
+          }
+          console.log('✅ Auth successful:', args.user?.email || args.primaryWallet?.address);
+        },
+        
+        onAuthFailure: (error) => {
+          console.error('❌ Auth failed:', error || 'Unknown error');
+        },
+        
+        onLogout: () => {
+          localStorage.removeItem('dynamic_user_id');
+        },
+        
+        onEmbeddedWalletCreated: () => {
+          console.log('✅ Embedded wallet created');
+        },
+      },
+    }}
+  >
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </DynamicContextProvider>,
+)
+```
+
+### Key Configuration Options
+
+<AccordionGroup>
+  <Accordion title="initialAuthenticationMode">
+    **connect-and-sign**: Requires users to sign a message after connecting for enhanced security.
+    
+    ```typescript
+    initialAuthenticationMode: 'connect-and-sign'
+    ```
+    
+    This adds an extra layer of authentication beyond just wallet connection.
+  </Accordion>
+  
+  <Accordion title="recommendedWallets">
+    Prioritizes specific wallets in the connection modal:
+    
+    ```typescript
+    recommendedWallets: [
+      { walletKey: 'metamask' },
+      { walletKey: 'coinbase' },
+      { walletKey: 'walletconnect' },
+    ]
+    ```
+    
+    These wallets appear at the top of the connection interface.
+  </Accordion>
+  
+  <Accordion title="overrides.evmNetworks">
+    Completely replaces Dynamic's default network list:
+    
+    ```typescript
+    overrides: {
+      evmNetworks: () => [
+        // Your custom networks
+      ]
+    }
+    ```
+    
+    **Important**: This overrides ALL defaults. Only your specified networks will be available.
+  </Accordion>
+  
+  <Accordion title="Event Handlers">
+    React to wallet lifecycle events:
+    
+    ```typescript
+    events: {
+      onAuthSuccess: (args) => {
+        // User successfully authenticated
+      },
+      onAuthFailure: (error) => {
+        // Authentication failed
+      },
+      onLogout: () => {
+        // User disconnected wallet
+      },
+      onEmbeddedWalletCreated: () => {
+        // Email wallet created
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Network Configuration
+
+### Base Sepolia (Primary Testnet)
+
+```typescript
+{
+  chainId: 84532,
+  chainName: 'Base Sepolia',
+  blockExplorerUrls: ['https://sepolia.basescan.org'],
+  rpcUrls: ['https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP'],
+  nativeCurrency: {
+    name: 'ETH',
+    symbol: 'ETH',
+    decimals: 18
+  }
+}
+```
+
+**Base Sepolia** is GweAI's primary testnet for development and testing.
+
+### BSC Testnet (Cross-Chain Support)
+
+```typescript
+{
+  chainId: 97,
+  chainName: 'BSC Testnet',
+  blockExplorerUrls: ['https://testnet.bscscan.com'],
+  rpcUrls: [
+    'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+    'https://bsc-testnet.publicnode.com'
+  ],
+  nativeCurrency: {
+    name: 'tBNB',
+    symbol: 'tBNB',
+    decimals: 18
+  }
+}
+```
+
+**BSC Testnet** enables cross-chain compatibility testing.
+
+<Note>
+  **Auto Network Switching**: Dynamic automatically prompts users to switch networks if they're on the wrong chain.
+</Note>
+
+## Using Dynamic in Components
+
+Access wallet state and functions using Dynamic's React hooks:
+
+```typescript
+import { DynamicUserProfile } from '@dynamic-labs/sdk-react-core';
+import App from './App.tsx';
+
+function App() {
+  return (
+    <>
+      <App />
+      {/* Dynamic User Profile - Required for wallet export */}
+      <DynamicUserProfile variant="modal" />
+    </>
+  );
+}
+```
+
+### Get Wallet Information
+
+```typescript
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+
+function MyComponent() {
+  const { 
+    primaryWallet,      // Currently connected wallet
+    user,              // User information
+    isAuthenticated,   // Authentication status
+    setShowAuthFlow,   // Open connection modal
+  } = useDynamicContext();
+  
+  const address = primaryWallet?.address;
+  const isConnected = isAuthenticated && !!primaryWallet;
+  
+  return (
+    <div>
+      {isConnected ? (
+        <p>Connected: {address}</p>
+      ) : (
+        <button onClick={() => setShowAuthFlow(true)}>
+          Connect Wallet
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+### Sign Messages
+
+```typescript
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+
+function SignMessage() {
+  const { primaryWallet } = useDynamicContext();
+  
+  const signMessage = async () => {
+    if (!primaryWallet) return;
+    
+    const message = 'Hello from GweAI!';
+    const signature = await primaryWallet.connector.signMessage(message);
+    
+    console.log('Signature:', signature);
+  };
+  
+  return <button onClick={signMessage}>Sign Message</button>;
+}
+```
+
+### Execute Transactions
+
+```typescript
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+import { ethers } from 'ethers';
+
+function SendTransaction() {
+  const { primaryWallet } = useDynamicContext();
+  
+  const sendTx = async () => {
+    if (!primaryWallet) return;
+    
+    const provider = await primaryWallet.connector.getPublicClient();
+    
+    const tx = {
+      to: '0x...',
+      value: ethers.parseEther('0.01'),
+      data: '0x'
+    };
+    
+    const txHash = await primaryWallet.connector.sendTransaction(tx);
+    console.log('Transaction:', txHash);
+  };
+  
+  return <button onClick={sendTx}>Send Transaction</button>;
+}
+```
+
+## Wallet Storage Management
+
+GweAI implements wallet-specific data isolation:
+
+```typescript
+import { useEffect } from 'react';
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core';
+
+export function useWalletStorageManager() {
+  const { primaryWallet, isAuthenticated } = useDynamicContext();
+  const address = primaryWallet?.address;
+  
+  useEffect(() => {
+    if (!isAuthenticated || !address) {
+      // Clear session data on disconnect
+      sessionStorage.clear();
+      return;
+    }
+    
+    // Load wallet-specific data
+    const walletData = localStorage.getItem(`wallet_${address}`);
+    if (walletData) {
+      // Restore wallet-specific state
+      const data = JSON.parse(walletData);
+      // ... apply data to app state
+    }
+  }, [address, isAuthenticated]);
+}
+```
+
+This ensures:
+- **Data isolation** between different wallets
+- **Automatic cleanup** on disconnect
+- **Persistent sessions** across page reloads
+
+## Connection Flow
+
+Here's the complete user journey:
+
+<Steps>
+
+### User Clicks Connect
+
+The `setShowAuthFlow(true)` function opens the Dynamic modal.
+
+```typescript
+<button onClick={() => setShowAuthFlow(true)}>
+  Connect Wallet
+</button>
+```
+
+### Select Wallet
+
+User chooses from:
+- MetaMask
+- Coinbase Wallet
+- WalletConnect
+- Email/Social (embedded wallet)
+
+### Approve Connection
+
+Wallet prompts user to approve the connection request.
+
+### Sign Authentication Message
+
+Because `initialAuthenticationMode: 'connect-and-sign'`, user must sign a message:
+
+```
+Sign this message to authenticate with GweAI
+
+Nonce: abc123...
+```
+
+### Authentication Success
+
+The `onAuthSuccess` event fires:
+
+```typescript
+onAuthSuccess: (args) => {
+  localStorage.setItem('dynamic_user_id', args.user.userId);
+  console.log('✅ Connected:', args.primaryWallet.address);
+}
+```
+
+### Verify Network
+
+Dynamic checks if the user is on Base Sepolia (chainId: 84532). If not, it prompts them to switch.
+
+### Ready to Trade
+
+User can now access all GweAI features: DCA strategies, AI trading, portfolio management.
+
+</Steps>
+
+## Advanced Features
+
+### Multi-Wallet Support
+
+Users can connect multiple wallets simultaneously:
+
+```typescript
+const { wallets } = useDynamicContext();
+
+// List all connected wallets
+wallets.forEach(wallet => {
+  console.log(wallet.address, wallet.connector.name);
+});
+```
+
+### Embedded Wallets (Email/Social)
+
+Users without crypto wallets can create one using email:
+
+```typescript
+// Dynamic handles embedded wallet creation automatically
+onEmbeddedWalletCreated: () => {
+  console.log('✅ Email wallet created');
+  // Wallet is immediately usable
+}
+```
+
+**Benefits:**
+- No browser extension required
+- Familiar email/social login UX
+- Full Web3 functionality
+- Account recovery via email
+
+### Account Abstraction
+
+Dynamic supports ERC-4337 account abstraction:
+
+```typescript
+// Gasless transactions (coming soon)
+const txHash = await primaryWallet.connector.sendTransaction({
+  to: contractAddress,
+  data: encodedData,
+  gasless: true  // Sponsor gas fees
+});
+```
+
+### Session Management
+
+Dynamic persists sessions across page reloads:
+
+```typescript
+useEffect(() => {
+  // Session automatically restored on page load
+  if (isAuthenticated) {
+    console.log('Session restored for:', primaryWallet.address);
+  }
+}, [isAuthenticated]);
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection Modal Not Appearing">
+    **Check:**
+    
+    1. Environment ID is correct in `.env`
+    2. `DynamicContextProvider` wraps your app
+    3. `setShowAuthFlow(true)` is being called
+    
+    ```typescript
+    // Verify environment ID
+    console.log(import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID);
+    ```
+  </Accordion>
+  
+  <Accordion title="Wrong Network Error">
+    **Solution:**
+    
+    Make sure Base Sepolia (chainId: 84532) is in your `evmNetworks` override:
+    
+    ```typescript
+    overrides: {
+      evmNetworks: () => [
+        {
+          chainId: 84532,
+          // ... rest of config
+        }
+      ]
+    }
+    ```
+    
+    Dynamic will automatically prompt network switch.
+  </Accordion>
+  
+  <Accordion title="Signature Request Keeps Appearing">
+    **Cause**: `connect-and-sign` mode requires signature on every new session.
+    
+    **Solutions:**
+    
+    1. Sign the message to complete authentication
+    2. Check for errors in browser console
+    3. Try refreshing and reconnecting
+    
+    **To disable** (not recommended for production):
+    
+    ```typescript
+    initialAuthenticationMode: 'connect-only'
+    ```
+  </Accordion>
+  
+  <Accordion title="Session Not Persisting">
+    **Check:**
+    
+    1. Cookies are enabled
+    2. LocalStorage is not blocked
+    3. Not in private/incognito mode
+    
+    ```typescript
+    // Debug session storage
+    console.log('User ID:', localStorage.getItem('dynamic_user_id'));
+    ```
+  </Accordion>
+  
+  <Accordion title="RPC Errors">
+    **Common causes:**
+    
+    - RPC endpoint rate limits
+    - Network congestion
+    - Invalid RPC URL
+    
+    **Solutions:**
+    
+    1. Use multiple RPC endpoints with fallbacks
+    2. Get your own Alchemy/Infura API key
+    3. Check network status on [Chainlist](https://chainlist.org)
+    
+    ```typescript
+    rpcUrls: [
+      'https://base-sepolia.g.alchemy.com/v2/YOUR_KEY',
+      'https://base-sepolia.blockpi.network/v1/rpc/public',
+      'https://base-sepolia-rpc.publicnode.com'
+    ]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<Warning>
+  **Never commit your Dynamic Environment ID to public repositories!** Use environment variables.
+</Warning>
+
+### Environment Variables
+
+```bash
+# .env (DO NOT COMMIT)
+VITE_DYNAMIC_ENVIRONMENT_ID=your_secret_id
+
+# .env.example (safe to commit)
+VITE_DYNAMIC_ENVIRONMENT_ID=your_dynamic_environment_id_here
+```
+
+### Sign-In Verification
+
+Always use `connect-and-sign` for production:
+
+```typescript
+initialAuthenticationMode: 'connect-and-sign'
+```
+
+This prevents attackers from connecting arbitrary wallets.
+
+### User Data Handling
+
+```typescript
+onAuthSuccess: (args) => {
+  // Only store necessary data
+  const safeData = {
+    userId: args.user?.userId,
+    address: args.primaryWallet?.address
+  };
+  
+  // Never store private keys or sensitive info
+  localStorage.setItem('user', JSON.stringify(safeData));
+}
+```
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Complete the full setup flow from connection to first trade
+  </Card>
+  
+  <Card title="DCA Strategies" icon="chart-line" href="/features/dca-investing">
+    Learn how to create automated investment strategies
+  </Card>
+  
+  <Card title="Dynamic Documentation" icon="book" href="https://docs.dynamic.xyz">
+    Explore Dynamic's complete documentation
+  </Card>
+  
+  <Card title="Wallet Integration" icon="code" href="/api/wallet-hooks">
+    Advanced wallet integration patterns
+  </Card>
+</CardGroup>
+
+---
+
+<Note>
+  **Need Help?** Join our Discord community or check the [Dynamic Support](https://docs.dynamic.xyz/docs/support) resources.
+</Note>

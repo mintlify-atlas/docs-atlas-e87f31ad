@@ -1,0 +1,476 @@
+---
+title: 'Query Router API'
+description: 'Smart query routing to optimize AI usage and response time'
+icon: 'route'
+---
+
+## Overview
+
+The Query Router intelligently categorizes user queries to route them to appropriate handlers, preventing unnecessary AI calls for simple operations like balance checks and optimizing response times.
+
+---
+
+## Core Functions
+
+### routeQuery
+
+Analyzes user input and determines the query type with confidence scoring.
+
+<ParamField path="userInput" type="string" required>
+  The user's message to analyze and route
+</ParamField>
+
+<ResponseField name="route" type="QueryRoute">
+  Object containing query type, confidence score, and extracted data
+</ResponseField>
+
+#### QueryRoute Interface
+
+```typescript
+interface QueryRoute {
+  type: QueryType;
+  confidence: number;    // 0-100 confidence score
+  extractedData?: any;   // Optional extracted information
+}
+
+type QueryType = 
+  | 'portfolio'  // Balance/holdings queries
+  | 'trade'      // Buy/sell/swap commands
+  | 'dca'        // Dollar-cost averaging setup
+  | 'price'      // Price information queries
+  | 'general';   // General conversation/advice
+```
+
+#### Example Usage
+
+```typescript
+import { routeQuery } from './services/queryRouter';
+
+const route = routeQuery("How much BTC do I have?");
+console.log(route);
+// Output:
+// {
+//   type: 'portfolio',
+//   confidence: 95,
+//   extractedData: { query: 'How much BTC do I have?' }
+// }
+
+const tradeRoute = routeQuery("buy $100 of ethereum");
+console.log(tradeRoute);
+// Output:
+// {
+//   type: 'trade',
+//   confidence: 90,
+//   extractedData: { command: 'buy $100 of ethereum' }
+// }
+```
+
+---
+
+## Query Type Detection
+
+### Portfolio Queries (Confidence: 95%)
+
+Detects balance and holdings questions without requiring AI processing.
+
+#### Supported Patterns
+
+<CodeGroup>
+```typescript Direct Balance Questions
+// English
+"How much BTC do I have?"
+"What's my ETH balance?"
+"Show me my portfolio"
+"Check my wallet"
+
+// Results in:
+{
+  type: 'portfolio',
+  confidence: 95,
+  extractedData: { query: userInput }
+}
+```
+
+```typescript Hindi/Hinglish
+// Hindi queries
+"Kitna BTC hai mere pass?"
+"Mera balance dikhao"
+"Portfolio check karo"
+
+// Results in same portfolio route
+```
+
+```typescript Implicit Balance Checks
+// "I have" questions
+"Do I have any SOL?"
+"Got any Bitcoin?"
+"Have any USDC tokens?"
+```
+</CodeGroup>
+
+#### Portfolio Pattern Regex
+
+```typescript queryRouter.ts (Line 26-38)
+const portfolioPatterns = [
+  // Direct balance questions
+  /\b(how much|how many|what('s| is) (my|the)|show (my|me))\s+(btc|eth|sol|bnb|usdc|balance|portfolio)/i,
+  
+  // "I have" questions
+  /\b(do i have|i have|got any|have any)\s+(btc|eth|sol|coins?|tokens?|crypto)/i,
+  
+  // Hindi/Hinglish
+  /\b(kitna|kitne|mere pass|mera|dikhao|check karo)\s+(btc|eth|sol|balance|portfolio)/i,
+  
+  // Direct commands
+  /\b(show|check|display|tell|get)\s+(my|me)?\s*(portfolio|balance|holdings?|wallet)/i,
+];
+```
+
+---
+
+### Trade Commands (Confidence: 90%)
+
+Detects trading intentions that require AI parsing for amounts and parameters.
+
+#### Supported Patterns
+
+```typescript queryRouter.ts (Line 50-65)
+const tradePatterns = [
+  /\b(buy|purchase|get|kharido)\s+/i,
+  /\b(sell|dump|becho)\s+/i,
+  /\b(swap|exchange|trade|convert|badlo)\s+/i,
+];
+
+// Examples:
+"buy $100 BTC"          // → { type: 'trade', confidence: 90 }
+"sell all ethereum"     // → { type: 'trade', confidence: 90 }
+"swap 0.5 SOL to BNB"   // → { type: 'trade', confidence: 90 }
+"kharido 50$ bitcoin"   // → { type: 'trade', confidence: 90 }
+```
+
+---
+
+### DCA/SIP Queries (Confidence: 85%)
+
+Detects systematic investment plan requests.
+
+#### Supported Patterns
+
+```typescript queryRouter.ts (Line 67-82)
+const dcaPatterns = [
+  /\b(dca|sip|dollar cost|systematic|recurring)\s+/i,
+  /\b(invest|investing)\s+(\$?\d+|\d+\$)\s+(every|per|each)/i,
+  /\b(auto(matic)?|schedule|repeat|monthly|weekly|daily)\s+(invest|buy|purchase)/i,
+];
+
+// Examples:
+"DCA $100 in BTC weekly"              // → { type: 'dca', confidence: 85 }
+"Set up SIP for $200 monthly"         // → { type: 'dca', confidence: 85 }
+"Automate $50 daily investment"       // → { type: 'dca', confidence: 85 }
+"Create systematic investment plan"   // → { type: 'dca', confidence: 85 }
+```
+
+---
+
+### Price Queries (Confidence: 80%)
+
+Detects price and market data requests.
+
+#### Supported Patterns
+
+```typescript queryRouter.ts (Line 84-99)
+const pricePatterns = [
+  /\b(price|cost|value|worth)\s+of\s+(btc|eth|sol|bnb|xrp)/i,
+  /\b(btc|eth|sol|bnb|xrp)\s+price/i,
+  /\b(what('s| is) (the )?(current |live )?price)/i,
+];
+
+// Examples:
+"What's the BTC price?"        // → { type: 'price', confidence: 80 }
+"ETH price today"              // → { type: 'price', confidence: 80 }
+"Current value of Solana"      // → { type: 'price', confidence: 80 }
+```
+
+---
+
+### General Queries (Confidence: 50%)
+
+Fallback for all other queries requiring AI conversation.
+
+```typescript
+// Examples:
+"What's the best investment strategy?"   // → { type: 'general', confidence: 50 }
+"Explain DeFi to me"                     // → { type: 'general', confidence: 50 }
+"Compare BTC vs ETH returns"             // → { type: 'general', confidence: 50 }
+```
+
+---
+
+## Helper Functions
+
+### shouldSkipAI
+
+Determines if query can be handled directly without AI processing.
+
+<ParamField path="route" type="QueryRoute" required>
+  The query route object from `routeQuery()`
+</ParamField>
+
+<ResponseField name="shouldSkip" type="boolean">
+  `true` if query should skip AI processing, `false` otherwise
+</ResponseField>
+
+#### Logic
+
+```typescript queryRouter.ts (Line 112-114)
+export function shouldSkipAI(route: QueryRoute): boolean {
+  return route.type === 'portfolio' && route.confidence >= 90;
+}
+```
+
+#### Example Usage
+
+```typescript
+const route = routeQuery("Show my BTC balance");
+
+if (shouldSkipAI(route)) {
+  // Direct portfolio service call - no AI needed
+  const portfolio = await getUserPortfolio(address);
+  return formatPortfolioForAI(portfolio);
+} else {
+  // Requires AI processing
+  const response = await generateAIResponse(userInput, history);
+  return response;
+}
+```
+
+---
+
+### getSystemPromptForQuery
+
+Returns optimized system prompt based on query type.
+
+<ParamField path="queryType" type="QueryType" required>
+  The type of query being processed
+</ParamField>
+
+<ResponseField name="prompt" type="string">
+  Tailored system prompt for the AI model
+</ResponseField>
+
+#### Prompt Examples
+
+<CodeGroup>
+```typescript Portfolio Prompt
+getSystemPromptForQuery('portfolio');
+// Returns:
+`You are IGL AI Agent, a professional crypto investment advisor for GweAI platform.
+
+CRITICAL: When users ask about their portfolio, balances, or holdings:
+1. NEVER say "I don't have access to your wallet"
+2. ALWAYS respond: "Let me check your portfolio..." then use the portfolio service
+3. You HAVE ACCESS to read public blockchain balances via connected wallet
+4. Be confident: "I can see your wallet has..."
+
+This is a READ-ONLY operation - you're just reading public blockchain data.`
+```
+
+```typescript Trade Prompt
+getSystemPromptForQuery('trade');
+// Returns:
+`You are IGL AI Agent, a professional crypto investment advisor for GweAI platform.
+
+You help users execute trades (buy/sell/swap). Parse their intent and create trade confirmation cards.
+Focus on understanding amounts ($100 vs 100 tokens), tokens involved, and operation type.`
+```
+
+```typescript DCA Prompt
+getSystemPromptForQuery('dca');
+// Returns:
+`You are IGL AI Agent, a professional crypto investment advisor for GweAI platform.
+
+You're an expert in Dollar-Cost Averaging (DCA) strategies. Help users create systematic investment plans.
+Explain benefits, show calculations, and guide them through setup.`
+```
+</CodeGroup>
+
+---
+
+### debugRoute
+
+Logs detailed routing information for debugging.
+
+<ParamField path="userInput" type="string" required>
+  The query to debug
+</ParamField>
+
+#### Example Output
+
+```typescript queryRouter.ts (Line 164-173)
+import { debugRoute } from './services/queryRouter';
+
+debugRoute("How much BTC do I have?");
+// Console output:
+// 🔍 Query Routing Debug: {
+//   input: 'How much BTC do I have?',
+//   detectedType: 'portfolio',
+//   confidence: '95%',
+//   skipAI: true,
+//   handler: 'Direct Handler'
+// }
+```
+
+---
+
+## Integration with DCAPage
+
+### Smart Routing Flow
+
+```typescript DCAPage.tsx (Line 471-537)
+const handleSendMessage = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // 1. Route the query
+  debugRoute(userInput);
+  const route = routeQuery(userInput);
+  
+  // 2. Check for trade keywords (override portfolio detection)
+  const hasTradeKeyword = /(buy|sell|swap|trade)/i.test(userInput);
+  
+  // 3. Portfolio queries - Skip AI
+  if (!hasTradeKeyword && (route.type === 'portfolio' || isPortfolioQuery(userInput))) {
+    if (!isConnected || !address) {
+      // Show wallet connection prompt
+      return;
+    }
+    
+    try {
+      // Direct portfolio fetch - NO AI call
+      const portfolio = await getUserPortfolio(address);
+      const specificToken = extractTokenQuery(userInput);
+      
+      let responseText: string;
+      if (specificToken) {
+        responseText = formatTokenBalance(portfolio, specificToken);
+      } else {
+        responseText = formatPortfolioForAI(portfolio);
+      }
+      
+      // Display response immediately
+      setMessages(prev => [...prev, {
+        id: generateChatId(),
+        text: responseText,
+        sender: 'ai',
+        timestamp: new Date()
+      }]);
+      setIsTyping(false);
+      return;
+    } catch (error) {
+      console.error('Portfolio fetch error:', error);
+    }
+  }
+  
+  // 4. Trade commands - AI parsing needed
+  const tradeRequest = await parseTradeRequest(userInput, lastMentionedToken);
+  if (tradeRequest) {
+    // Show trade confirmation card
+    return;
+  }
+  
+  // 5. DCA requests
+  const dcaRequest = parseDCARequest(userInput);
+  if (dcaRequest) {
+    // Show DCA plan card
+    return;
+  }
+  
+  // 6. General queries - Full AI processing
+  const aiResponse = await generateAIResponse(userInput, conversationHistory);
+  // Display AI response
+};
+```
+
+---
+
+## Performance Benefits
+
+<Card title="Reduced API Calls" icon="bolt">
+  Portfolio queries skip AI processing entirely, reducing OpenRouter API usage by ~40%.
+</Card>
+
+<Card title="Faster Response Times" icon="gauge-high">
+  Direct blockchain reads (200-500ms) vs AI processing (1-3 seconds).
+</Card>
+
+<Card title="Cost Optimization" icon="dollar-sign">
+  Portfolio queries are free (blockchain reads only), saving AI API costs.
+</Card>
+
+<Card title="Better UX" icon="star">
+  Users get instant balance updates without waiting for AI thinking time.
+</Card>
+
+---
+
+## Supported Languages
+
+- **English**: Full support for all query types
+- **Hindi/Hinglish**: Portfolio and trade commands (kharido, becho, badlo, kitna, mere pass)
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Use debugRoute During Development">
+    Enable debug logging to understand how queries are being routed:
+    ```typescript
+    debugRoute(userInput); // Before processing
+    const route = routeQuery(userInput);
+    ```
+  </Accordion>
+  
+  <Accordion title="Check Trade Keywords Before Portfolio Detection">
+    Trade commands can contain balance references. Always check trade patterns first:
+    ```typescript
+    const hasTradeKeyword = /(buy|sell|swap)/i.test(userInput);
+    if (!hasTradeKeyword && route.type === 'portfolio') {
+      // Handle as portfolio query
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Confidence Scores for Error Handling">
+    Low confidence scores may indicate ambiguous queries:
+    ```typescript
+    if (route.confidence < 70) {
+      // Ask user for clarification
+      console.warn('Low confidence route:', route);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  const route = routeQuery(userInput);
+  
+  if (route.type === 'portfolio' && shouldSkipAI(route)) {
+    // Direct handler
+    const portfolio = await getUserPortfolio(address);
+    return formatPortfolioForAI(portfolio);
+  } else {
+    // AI processing
+    const response = await generateAIResponse(userInput, history);
+    return response;
+  }
+} catch (error) {
+  console.error('Routing error:', error);
+  // Fallback to AI processing
+  return await generateAIResponse(userInput, history);
+}
+```

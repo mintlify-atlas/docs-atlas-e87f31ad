@@ -1,0 +1,303 @@
+---
+title: Router Contract
+description: Main trading interface for token swaps with automatic routing and slippage protection
+---
+
+## Overview
+
+The Router contract is the primary interface for executing token swaps on GweAI. It provides automatic routing through USDC pairs and includes built-in slippage protection.
+
+**Contract Address:** `0x49B538646dc51f1b8c533113113A7dE05fBC2218`
+
+**Verification:** [View on BaseScan](https://sepolia.basescan.org/address/0x49B538646dc51f1b8c533113113A7dE05fBC2218)
+
+## Key Features
+
+- Token-to-token swaps with automatic routing
+- Direct swaps for USDC pairs
+- Multi-hop routing through USDC for other pairs
+- Slippage protection with minimum output amounts
+- Protocol fee collection (0.3%)
+- Gas-optimized unlimited approvals
+
+## Main Functions
+
+### swap
+
+Executes a token-to-token swap with slippage protection.
+
+<ParamField path="tokenIn" type="address" required>
+  Address of the input token to swap from
+</ParamField>
+
+<ParamField path="tokenOut" type="address" required>
+  Address of the output token to receive
+</ParamField>
+
+<ParamField path="amountIn" type="uint256" required>
+  Amount of input tokens to swap (in token's smallest unit)
+</ParamField>
+
+<ParamField path="minAmountOut" type="uint256" required>
+  Minimum amount of output tokens to receive (slippage protection)
+</ParamField>
+
+**Function Signature:** `0xfe029156`
+
+### getQuote
+
+Get a price quote for a swap without executing it.
+
+<ParamField path="tokenIn" type="address" required>
+  Address of the input token
+</ParamField>
+
+<ParamField path="tokenOut" type="address" required>
+  Address of the output token
+</ParamField>
+
+<ParamField path="amountIn" type="uint256" required>
+  Amount of input tokens
+</ParamField>
+
+**Returns:**
+- `amountOut` (uint256) - Expected output amount
+- `protocolFee` (uint256) - Protocol fee charged
+
+## Integration Example
+
+Here's how the Router is used in the GweAI frontend:
+
+```typescript
+import { useSwapContract } from '@/hooks/useSwapContract';
+import { parseUnits } from 'viem';
+import { getVerifiedContract, isVerifiedToken } from '@/config/contracts';
+
+const ROUTER_ADDRESS = getVerifiedContract('ROUTER');
+
+const { executeSwap, getSwapQuote } = useSwapContract();
+
+// Step 1: Get quote
+const quote = await getSwapQuote({
+  tokenInAddress: '0xBEE08798a3634e29F47e3d277C9d11507D55F66a', // USDC
+  tokenOutAddress: '0x7d9E31f5cCac4b9c8566f343A6bD6f3263DFcC91', // BTC
+  amountIn: '100',
+  tokenInDecimals: 6,
+  tokenOutDecimals: 8,
+});
+
+console.log('Expected output:', quote.amountOut);
+console.log('Protocol fee:', quote.protocolFee);
+console.log('Route:', quote.route); // "Direct" or "Via USDC"
+
+// Step 2: Execute swap
+const txHash = await executeSwap({
+  tokenInAddress: '0xBEE08798a3634e29F47e3d277C9d11507D55F66a',
+  tokenOutAddress: '0x7d9E31f5cCac4b9c8566f343A6bD6f3263DFcC91',
+  amountIn: '100',
+  tokenInDecimals: 6,
+  tokenOutDecimals: 8,
+  slippageBps: 50, // 0.5% slippage tolerance
+});
+```
+
+## Swap Flow
+
+The complete swap process with security validation:
+
+```typescript
+// 1. Validate tokens are whitelisted
+if (!isVerifiedToken(tokenInAddress)) {
+  throw new Error('Input token not in whitelist');
+}
+
+if (!isVerifiedToken(tokenOutAddress)) {
+  throw new Error('Output token not in whitelist');
+}
+
+// 2. Validate router contract
+const validation = await validateTransaction({
+  contractAddress: ROUTER_ADDRESS,
+  contractType: 'ROUTER',
+  userAddress: address,
+});
+
+if (!validation.valid) {
+  throw new Error(validation.error);
+}
+
+// 3. Check current allowance
+const currentAllowance = await publicClient.readContract({
+  address: tokenInAddress,
+  abi: erc20Abi,
+  functionName: 'allowance',
+  args: [userAddress, ROUTER_ADDRESS],
+});
+
+// 4. Approve if needed (unlimited approval for better UX)
+if (currentAllowance < amountInWei) {
+  const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+  const approveData = `0x095ea7b3${ROUTER_ADDRESS.slice(2).padStart(64, '0')}${maxApproval}`;
+  
+  const approveTx = await walletClient.sendTransaction({
+    to: tokenInAddress,
+    data: approveData,
+  });
+  
+  await publicClient.waitForTransactionReceipt({ hash: approveTx });
+}
+
+// 5. Execute swap
+const swapData = `0xfe029156${
+  tokenInAddress.slice(2).padStart(64, '0')
+}${
+  tokenOutAddress.slice(2).padStart(64, '0')
+}${
+  amountInWei.toString(16).padStart(64, '0')
+}${
+  minAmountOutWei.toString(16).padStart(64, '0')
+}`;
+
+const swapTx = await walletClient.sendTransaction({
+  to: ROUTER_ADDRESS,
+  data: swapData,
+});
+
+await publicClient.waitForTransactionReceipt({ hash: swapTx });
+```
+
+## Slippage Calculation
+
+Slippage protection is automatically calculated:
+
+```typescript
+// Get quote for expected output
+const quoteResult = await getSwapQuote(params);
+const expectedOut = parseUnits(quoteResult.amountOut, tokenOutDecimals);
+
+// Apply slippage tolerance (default 0.5% = 50 basis points)
+const slippageBps = 50;
+const minAmountOut = (expectedOut * BigInt(10000 - slippageBps)) / BigInt(10000);
+
+// Example: 
+// Expected: 100 tokens
+// Slippage: 0.5%
+// Min output: 99.5 tokens
+```
+
+## Routing Logic
+
+The Router automatically determines the optimal path:
+
+### Direct Route
+
+Used when one token is USDC:
+
+```
+USDC → BTC (single swap)
+SOL → USDC (single swap)
+```
+
+### Multi-Hop Route
+
+Used when neither token is USDC:
+
+```
+BTC → USDC → SOL (two swaps)
+AVAX → USDC → BNB (two swaps)
+```
+
+## Gas Optimization
+
+### Unlimited Approvals
+
+To reduce gas costs and improve UX, the frontend uses unlimited token approvals:
+
+```typescript
+// Approve max uint256 (only needs to be done once per token)
+const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+
+// Users don't need to approve before every swap
+```
+
+<Warning>
+Unlimited approvals are safe when using verified contracts, but users should understand they're granting permanent spending permission to the Router contract.
+</Warning>
+
+### Cached Wallet Client
+
+The swap hook caches the wallet client for instant transaction popups:
+
+```typescript
+const walletClientRef = useRef<any>(null);
+
+// Preload on mount
+useEffect(() => {
+  primaryWallet?.getWalletClient?.().then((client) => {
+    walletClientRef.current = client;
+  });
+}, [primaryWallet]);
+```
+
+## Error Handling
+
+Common errors and their causes:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "SECURITY: Input token not in whitelist" | Token not verified | Use only supported tokens |
+| "SECURITY: Output token not in whitelist" | Token not verified | Use only supported tokens |
+| "Insufficient balance" | User lacks input tokens | Add funds to wallet |
+| "Slippage tolerance exceeded" | Price moved unfavorably | Increase slippage tolerance |
+| "Contract validation failed" | Router address mismatch | Check network connection |
+
+## Events
+
+The Router emits events that can be monitored:
+
+```solidity
+event SwapExecuted(
+  address indexed user,
+  address indexed tokenIn,
+  address indexed tokenOut,
+  uint256 amountIn,
+  uint256 amountOut,
+  uint256 protocolFee
+);
+```
+
+## Security Considerations
+
+<Warning>
+**Critical Security Features:**
+
+1. All token addresses must be whitelisted
+2. Contract address is immutable and verified on-chain
+3. Function signatures are validated before execution
+4. All transactions are logged for monitoring
+5. Slippage protection prevents front-running attacks
+</Warning>
+
+## Testing
+
+To test Router integration:
+
+```bash
+# Get test tokens from Base Sepolia faucet
+# USDC: 0xBEE08798a3634e29F47e3d277C9d11507D55F66a
+
+# Execute test swap
+npm run test:swap
+```
+
+## Related Contracts
+
+<CardGroup cols={2}>
+  <Card title="Liquidity Pool" icon="droplet" href="/contracts/liquidity-pool">
+    Router pulls liquidity from the pool
+  </Card>
+  
+  <Card title="Contract Overview" icon="list" href="/contracts/overview">
+    View all contract addresses
+  </Card>
+</CardGroup>

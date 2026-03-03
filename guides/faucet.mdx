@@ -1,0 +1,336 @@
+---
+title: 'Testnet Faucet'
+description: 'Get free testnet tokens to start using GweAI platform'
+---
+
+# Testnet Faucet
+
+The GweAI Testnet Faucet provides free tokens on Base Sepolia network, allowing you to test platform features without using real funds.
+
+## What is a Faucet?
+
+A faucet is a service that distributes free testnet cryptocurrency tokens. These tokens:
+- Have no real monetary value
+- Work identically to mainnet tokens
+- Allow you to test all platform features
+- Are used for learning and development
+
+<Note>
+Testnet tokens are only valid on the Base Sepolia test network. They cannot be used on mainnet and have no real-world value.
+</Note>
+
+## Available Tokens
+
+Each faucet claim provides:
+
+### USDC (USD Coin)
+
+**Amount**: 100 USDC
+
+**Use Cases**:
+- Primary trading pair for all assets
+- Purchasing subscription plans
+- Executing swap transactions
+- Testing DCA strategies
+
+### ETH (Ethereum)
+
+**Amount**: 0.001 ETH
+
+**Use Cases**:
+- Paying gas fees for all transactions
+- Testing ETH trading
+- Vault staking operations
+- Sending transactions on-chain
+
+<Tip>
+You receive both tokens in a single claim, ensuring you have both trading capital (USDC) and gas money (ETH).
+</Tip>
+
+## Claiming Tokens
+
+<Steps>
+  <Step title="Connect Your Wallet">
+    Navigate to the Faucet page and connect your wallet using the Dynamic authentication flow.
+    
+    <Warning>
+      You must connect your wallet before claiming tokens. The faucet needs your wallet address to send tokens.
+    </Warning>
+  </Step>
+
+  <Step title="Check Eligibility">
+    The faucet will display:
+    - Your current USDC balance
+    - Your current ETH balance
+    - Whether you've already claimed (if applicable)
+  </Step>
+
+  <Step title="Click Claim Tokens">
+    Click the blue "Claim Tokens" button to initiate the request.
+  </Step>
+
+  <Step title="Processing">
+    The faucet bot processes your claim:
+    - Verifies your wallet address
+    - Checks claim eligibility
+    - Sends both USDC and ETH in a single transaction
+    - Confirms on-chain
+    
+    This typically takes 10-30 seconds.
+  </Step>
+
+  <Step title="Confirmation">
+    Once successful:
+    - You'll see a success message with the transaction hash
+    - Your balances will update automatically
+    - The page will refresh to show your new balances
+  </Step>
+</Steps>
+
+## Claim Restrictions
+
+### One-Time Claim
+
+Each wallet address can claim from the faucet once per 24-hour period.
+
+<Note>
+The 24-hour cooldown is enforced by the smart contract to prevent abuse and ensure fair distribution.
+</Note>
+
+### Claim Status
+
+Your claim status is stored locally and tracked on-chain:
+
+```typescript
+interface ClaimStatus {
+  usdcClaimed: boolean;  // Whether USDC was claimed
+  ethClaimed: boolean;   // Whether ETH was claimed
+  usdcTimestamp?: number; // When USDC was claimed
+  ethTimestamp?: number;  // When ETH was claimed
+}
+```
+
+Both tokens are claimed together, so both flags will be set simultaneously.
+
+## Faucet Interface
+
+### Token Display Cards
+
+Two cards show the claimable amounts:
+
+**USDC Card**:
+- Token logo
+- Claim amount (100)
+- Current balance
+- Token symbol
+
+**ETH Card**:
+- Token logo
+- Claim amount (0.001)
+- Current balance
+- Token symbol
+
+### Claim Button States
+
+| State | Appearance | Action |
+|-------|------------|--------|
+| **Ready** | Blue gradient | Click to claim tokens |
+| **Processing** | Gray with spinner | Wait for transaction |
+| **Claimed** | Green with checkmark | Already claimed, wait 24h |
+| **Disconnected** | Gray disabled | Connect wallet first |
+
+## Gasless Transactions
+
+The faucet uses a bot-operated system for gasless token distribution:
+
+1. Your browser sends a claim request to the faucet bot
+2. The bot validates your wallet address
+3. The bot pays gas fees to send you tokens
+4. You receive tokens without spending any gas
+
+<Tip>
+This is especially helpful for new users who don't have any testnet ETH yet.
+</Tip>
+
+## Faucet Bot API
+
+The faucet communicates with a backend service:
+
+```typescript
+// Request claim
+POST /api/faucet/request-claim
+{
+  "address": "0xYourWalletAddress"
+}
+
+// Response
+{
+  "success": true,
+  "txHash": "0xTransactionHash",
+  "amount": {
+    "usdc": "100",
+    "eth": "0.001"
+  }
+}
+```
+
+## What to Do After Claiming
+
+Once you have testnet tokens:
+
+### 1. Purchase a Subscription
+
+Use your USDC to buy a Monthly or Yearly subscription plan:
+- Navigate to [Subscription Plans](/guides/subscription-plans)
+- Select a plan
+- Complete the purchase
+
+### 2. Start Trading
+
+Begin using DCA trading features:
+- Set up automated trading strategies
+- Execute manual trades
+- Test different trading pairs
+
+### 3. Try Token Swaps
+
+Swap between different tokens:
+- Navigate to the Swap page
+- Exchange USDC for other assets
+- Test different trading routes
+
+### 4. Explore Vaults
+
+Deposit tokens in yield-generating vaults:
+- Stake tokens for fixed periods
+- Earn simulated yields
+- Test early unstaking penalties
+
+<Tip>
+Start with small amounts to familiarize yourself with each feature before executing larger transactions.
+</Tip>
+
+## Troubleshooting
+
+### Faucet is Offline
+
+**Error Message**: "Faucet is currently disabled. Please try again later."
+
+**Causes**:
+- Faucet bot service is down
+- Network connectivity issues
+- Maintenance in progress
+
+**Solutions**:
+1. Wait a few minutes and try again
+2. Check platform status page
+3. Contact support if issue persists
+
+<Note>
+The faucet bot runs as a separate service and may occasionally be offline for maintenance.
+</Note>
+
+### Already Claimed Error
+
+**Error Message**: "You have already claimed [TOKEN] from the faucet"
+
+**Cause**: Your wallet has claimed tokens within the last 24 hours.
+
+**Solution**: Wait until the 24-hour cooldown period expires, then try again.
+
+### Wallet Not Connected
+
+**Symptom**: Claim button is disabled
+
+**Cause**: No wallet is currently connected
+
+**Solution**: Click "Connect Wallet" in the top navigation and complete the authentication flow.
+
+### Tokens Not Received
+
+**Symptom**: Success message shown but balance not updated
+
+**Possible Causes**:
+- Transaction still confirming
+- Balance cache not refreshed
+- Network delay
+
+**Solutions**:
+1. Wait 30-60 seconds for confirmation
+2. Manually refresh the page
+3. Check transaction on [BaseScan](https://sepolia.basescan.org) using the transaction hash from the success message
+4. Navigate to [Deposit page](/guides/deposit-funds) to see updated balances
+
+### Transaction Failed
+
+**Symptom**: Error message during claim process
+
+**Possible Causes**:
+- Faucet bot out of funds
+- Smart contract error
+- Network congestion
+
+**Solutions**:
+1. Try again in a few minutes
+2. Verify your wallet address is valid
+3. Check that you're on Base Sepolia network
+4. Contact support with error details
+
+## Faucet Limitations
+
+<Warning>
+The testnet faucet has the following limitations:
+- **Claim Frequency**: Once per 24 hours per wallet
+- **Fixed Amounts**: Cannot request custom amounts
+- **Network**: Base Sepolia only (not available on mainnet)
+- **Availability**: Subject to faucet bot uptime
+</Warning>
+
+## Alternative Token Sources
+
+If the faucet is unavailable:
+
+### Official Base Sepolia Faucets
+
+1. **Coinbase Faucet**: [coinbase.com/faucets/base-ethereum-sepolia-faucet](https://coinbase.com/faucets/base-ethereum-sepolia-faucet)
+2. **Alchemy Faucet**: [sepoliafaucet.com](https://sepoliafaucet.com)
+
+### Bridge from Sepolia
+
+1. Get ETH on Ethereum Sepolia
+2. Use the official Base bridge
+3. Bridge to Base Sepolia
+
+<Tip>
+For larger amounts of test tokens, you may need to use multiple faucets across different platforms.
+</Tip>
+
+## Best Practices
+
+### Conserve Gas
+
+- Batch transactions when possible
+- Avoid failed transactions by double-checking inputs
+- Use appropriate gas limits
+
+### Track Your Tokens
+
+- Monitor your ETH balance for gas
+- Keep sufficient USDC for trading
+- Don't deplete all tokens at once
+
+### Test Incrementally
+
+- Start with small transaction amounts
+- Test one feature at a time
+- Verify each transaction before proceeding
+
+### Request More When Needed
+
+- Wait for 24-hour cooldown to claim again
+- Plan your testing to maximize token utility
+- Use multiple test wallets if needed (for development)
+
+<Note>
+Testnet tokens are valuable for learning. Treat them as if they were real to develop good security and transaction habits.
+</Note>

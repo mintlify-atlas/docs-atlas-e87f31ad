@@ -1,0 +1,520 @@
+---
+title: 'Portfolio Tracking'
+description: 'Monitor your cryptocurrency holdings and performance in real-time'
+icon: 'wallet'
+---
+
+## Overview
+
+GweAI's Portfolio page provides a comprehensive view of your crypto holdings, real-time values, and performance metrics. All data is fetched directly from your connected wallet.
+
+<CardGroup cols={2}>
+  <Card title="Real-Time Prices" icon="chart-line">
+    Live price updates every 30 seconds from CoinGecko
+  </Card>
+  <Card title="Multi-Token Support" icon="coins">
+    Track 11 major cryptocurrencies and stablecoins
+  </Card>
+  <Card title="Performance Charts" icon="chart-area">
+    Visual representation of portfolio value over time
+  </Card>
+  <Card title="Wallet-Specific" icon="user">
+    Each wallet address has separate tracking
+  </Card>
+</CardGroup>
+
+## Accessing Your Portfolio
+
+<Steps>
+  <Step title="Connect Wallet">
+    Click **Connect Wallet** in the top navigation
+    
+    Select your wallet provider (MetaMask, WalletConnect, etc.)
+  </Step>
+  <Step title="Navigate to Portfolio">
+    Click **Portfolio** in the main menu
+  </Step>
+  <Step title="View Your Holdings">
+    Your balances load automatically from your wallet
+  </Step>
+</Steps>
+
+<Note>
+**Privacy:** Portfolio data is read-only. No signatures or approvals are required to view your holdings.
+</Note>
+
+## Portfolio Dashboard
+
+### Overview Stats
+
+Three key metrics are displayed prominently:
+
+<Frame>
+  <img src="/images/portfolio-stats.png" alt="Portfolio overview statistics" />
+</Frame>
+
+#### Total Value
+
+```typescript
+// Calculation from PortfolioPage.tsx
+const totalValue = useMemo(() => {
+  const ethValue = parseFloat(ethBalance) * ETH_PRICE;
+  const usdcValue = parseFloat(usdcBalance) * USDC_PRICE;
+  const btcValue = parseFloat(btcBalance) * BTC_PRICE;
+  const solValue = parseFloat(solBalance) * SOL_PRICE;
+  // ... other tokens
+  return ethValue + usdcValue + btcValue + solValue + ...;
+}, [balances, prices]);
+```
+
+**Shows:**
+- Combined USD value of all holdings
+- Real-time price calculations
+- Auto-updates when prices change
+
+#### Total Holdings
+
+**Shows:**
+- Number of different tokens you own
+- Only counts tokens with balance > 0
+- Example: If you have BTC, ETH, and USDC, shows "3 Active tokens"
+
+### Holdings List
+
+Detailed breakdown of each token:
+
+| Column | Description | Example |
+|--------|-------------|--------|
+| **Token** | Name and logo | Bitcoin (BTC) |
+| **Balance** | Amount owned | 0.05 BTC |
+| **Price** | Current USD price | $45,000 |
+| **Value** | Balance × Price | $2,250 |
+
+```typescript
+// Token holdings array from PortfolioPage.tsx
+const tokenHoldings = useMemo(() => [
+  { 
+    symbol: 'BTC', 
+    name: 'Bitcoin', 
+    balance: btcBalance, 
+    price: BTC_PRICE, 
+    logo: TOKENS.BTC.logo 
+  },
+  { 
+    symbol: 'ETH', 
+    name: 'Ethereum', 
+    balance: ethBalance, 
+    price: ETH_PRICE, 
+    logo: TOKENS.ETH.logo 
+  },
+  // ... filtered to only show tokens with balance > 0
+].filter(token => parseFloat(token.balance) > 0), [balances, prices]);
+```
+
+## Supported Tokens
+
+Your portfolio tracks these assets:
+
+<AccordionGroup>
+  <Accordion title="Bitcoin (BTC)" icon="bitcoin">
+    **Decimals:** 8
+    
+    **Display:** Shows up to 6 decimal places
+    
+    **Example:** 0.123456 BTC
+  </Accordion>
+
+  <Accordion title="Ethereum (ETH)" icon="ethereum">
+    **Decimals:** 18
+    
+    **Display:** Shows 4 decimal places
+    
+    **Example:** 1.2345 ETH
+    
+    **Note:** Currently display-only, not tradeable
+  </Accordion>
+
+  <Accordion title="Solana (SOL)" icon="s">
+    **Decimals:** 9
+    
+    **Display:** Shows 4 decimal places
+    
+    **Example:** 25.5000 SOL
+  </Accordion>
+
+  <Accordion title="BNB" icon="b">
+    **Decimals:** 18
+    
+    **Display:** Shows 8 decimal places
+    
+    **Example:** 0.12345678 BNB
+  </Accordion>
+
+  <Accordion title="Stablecoins (USDC)" icon="dollar-sign">
+    **Decimals:** 6
+    
+    **Display:** Shows 2 decimal places
+    
+    **Example:** 1,234.56 USDC
+    
+    **Price:** Always $1.00
+  </Accordion>
+
+  <Accordion title="Other Tokens">
+    - **XRP** (Ripple) - 6 decimals
+    - **TON** (Toncoin) - 9 decimals
+    - **AVAX** (Avalanche) - 18 decimals
+    - **TRX** (TRON) - 6 decimals
+    - **ADA** (Cardano) - 6 decimals
+    - **DOGE** (Dogecoin) - 8 decimals
+  </Accordion>
+</AccordionGroup>
+
+## Performance Chart
+
+### Real-Time Value Tracking
+
+The performance chart shows your portfolio's value over time:
+
+```typescript
+// From PerformanceChart component
+<PerformanceChart 
+  currentValue={totalValue}
+  isConnected={connected}
+  walletAddress={address}
+/>
+```
+
+**Features:**
+- **Live Updates:** Refreshes as prices change
+- **Historical Data:** Shows past performance
+- **Timeframe Selection:** 24h, 7d, 30d, 90d, 1y, All
+- **Interactive Tooltips:** Hover to see exact values
+
+### How It Works
+
+<Steps>
+  <Step title="Initial Snapshot">
+    When you first connect, the chart records your current portfolio value
+  </Step>
+  <Step title="Continuous Tracking">
+    Every price update creates a new data point
+  </Step>
+  <Step title="Storage">
+    Data is stored in browser localStorage per wallet address
+  </Step>
+  <Step title="Visualization">
+    Chart renders using your historical snapshots
+  </Step>
+</Steps>
+
+<Note>
+**Privacy:** Chart data is stored locally in your browser only. It's never sent to servers.
+</Note>
+
+## Price Updates
+
+### Global Price Context
+
+All prices come from a centralized context:
+
+```typescript
+// From PriceContext.tsx
+const { prices, priceChanges } = useGlobalPrices();
+
+// Fetches every 30 seconds
+const fetchPrices = async () => {
+  const response = await fetch(
+    'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,...&vs_currencies=usd&include_24hr_change=true'
+  );
+  const data = await response.json();
+  setPrices({
+    btc: data.bitcoin.usd,
+    eth: data.ethereum.usd,
+    sol: data.solana.usd,
+    // ...
+  });
+};
+```
+
+### Update Frequency
+
+- **Auto-Refresh:** Every 30 seconds
+- **Manual Refresh:** Click the refresh icon
+- **On Page Load:** Immediate fetch when visiting portfolio
+
+## Balance Fetching
+
+### Direct Wallet Integration
+
+Balances are read directly from your wallet:
+
+```typescript
+// From useAgwWallet.ts
+const { 
+  btcBalance,    // "0.05"
+  ethBalance,    // "1.2345"
+  solBalance,    // "25.5"
+  usdcBalance,   // "1234.56"
+  // ... other tokens
+  connected,     // true/false
+  address        // "0x123..."
+} = useAgwWallet();
+```
+
+### Refresh Mechanism
+
+<AccordionGroup>
+  <Accordion title="Automatic Refresh" icon="rotate">
+    Balances refresh automatically after:
+    - Completing a trade
+    - Executing a swap
+    - Staking/unstaking tokens
+    - Depositing/withdrawing
+  </Accordion>
+
+  <Accordion title="Manual Refresh" icon="hand-pointer">
+    Use the refresh button to force an update:
+    
+    ```typescript
+    const { refreshBalance } = useAgwWallet();
+    await refreshBalance();
+    ```
+  </Accordion>
+
+  <Accordion title="On Wallet Change" icon="wallet">
+    Switching wallets triggers immediate refresh:
+    
+    ```typescript
+    useEffect(() => {
+      if (connected && address) {
+        refreshBalance();
+      }
+    }, [address, connected]);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Portfolio Features
+
+### Empty State
+
+If you haven't connected a wallet:
+
+<Frame>
+  <img src="/images/portfolio-empty.png" alt="Portfolio empty state" />
+</Frame>
+
+**Shows:**
+- Connect wallet prompt
+- Feature preview
+- Benefits of connecting
+
+### No Holdings State
+
+If wallet is connected but has no assets:
+
+```
+🪙 No assets in your wallet
+
+Deposit tokens to get started
+```
+
+**Actions:**
+- [Deposit Funds](/guides/deposit-funds)
+- [Buy Crypto](/features/trading)
+- [Swap Tokens](/features/swap)
+
+## Using Portfolio Data
+
+### With AI Chat
+
+The AI Chat can query your portfolio:
+
+```
+User: "Show my portfolio"
+
+AI: 📊 Your Portfolio
+
+Total Value: $12,345.67
+
+| Token | Balance | Value |
+|-------|---------|-------|
+| BTC   | 0.05    | $2,250|
+| ETH   | 1.2345  | $4,100|
+| SOL   | 25.5    | $3,570|
+| USDC  | 2,425.67| $2,426|
+```
+
+### Token-Specific Queries
+
+```
+User: "How much BTC do I have?"
+
+AI: 🪙 Bitcoin Holdings
+
+Balance: 0.05 BTC
+Value: $2,250.00
+Price: $45,000 per BTC
+```
+
+### Portfolio Analysis
+
+```typescript
+// From portfolioService.ts
+export async function getUserPortfolio(address: string) {
+  const balances = await getWalletBalances(address);
+  const prices = await getCurrentPrices();
+  
+  return {
+    tokens: balances.map(b => ({
+      symbol: b.symbol,
+      amount: b.balance,
+      usdValue: b.balance * prices[b.symbol]
+    })),
+    totalValue: calculateTotalValue(balances, prices)
+  };
+}
+```
+
+## Tax and Record Keeping
+
+### Transaction History
+
+While the Portfolio page shows current holdings, transaction history is available in:
+
+- **Trading Page:** Trade history for buys/sells
+- **Swap Page:** Token swap transactions
+- **Vault Page:** Staking/unstaking records
+
+### Export Functionality (Coming Soon)
+
+<Info>
+CSV export for tax reporting is planned. For now, you can:
+1. View transaction hashes in history tables
+2. Use blockchain explorers for full records
+3. Keep manual records of transactions
+</Info>
+
+## Performance Metrics
+
+### Calculating Returns
+
+**Unrealized Gain/Loss:**
+```
+Current Value - Total Invested = Unrealized P&L
+```
+
+**Percentage Return:**
+```
+((Current Value / Total Invested) - 1) × 100 = Return %
+```
+
+**Average Cost Basis:**
+```
+Total USD Invested ÷ Total Tokens Owned = Avg Cost
+```
+
+<Warning>
+**Note:** GweAI currently shows snapshot values only. Full P&L tracking requires manual calculation or third-party tools.
+</Warning>
+
+## Mobile Experience
+
+The portfolio page is fully responsive:
+
+- **Tablet:** 2-column holdings grid
+- **Mobile:** Single-column stacked layout
+- **Touch-Friendly:** Large tap targets
+- **Optimized Charts:** Simplified on small screens
+
+## Security & Privacy
+
+<CardGroup cols={2}>
+  <Card title="Read-Only Access" icon="book-open">
+    No signatures required to view portfolio
+  </Card>
+  <Card title="Local Storage" icon="hard-drive">
+    Chart data stored in browser only
+  </Card>
+  <Card title="No Server Tracking" icon="shield">
+    Portfolio queries don't leave your device
+  </Card>
+  <Card title="Wallet-Specific" icon="fingerprint">
+    Each address has isolated data
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Balances Not Showing
+
+**Cause:** Wallet not properly connected
+
+**Solution:**
+1. Disconnect and reconnect wallet
+2. Refresh the page
+3. Check network (should be Base Sepolia)
+
+### Prices Not Updating
+
+**Cause:** API rate limiting or network issue
+
+**Solution:**
+1. Wait 30 seconds for auto-refresh
+2. Click manual refresh button
+3. Check internet connection
+
+### Wrong Total Value
+
+**Cause:** Stale price data
+
+**Solution:**
+1. Force refresh prices
+2. Check CoinGecko status
+3. Verify token balances are correct
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Regular Monitoring" icon="calendar-check">
+    Check portfolio weekly, not daily
+    
+    Reduces emotional trading decisions
+  </Accordion>
+
+  <Accordion title="Keep Records" icon="file-lines">
+    Save transaction hashes for tax purposes
+    
+    Export data before clearing browser cache
+  </Accordion>
+
+  <Accordion title="Diversification" icon="chart-pie">
+    Monitor allocation across tokens
+    
+    Avoid over-concentration in one asset
+  </Accordion>
+
+  <Accordion title="Performance Tracking" icon="chart-line">
+    Use chart to assess long-term trends
+    
+    Ignore short-term volatility
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Trading" icon="chart-candlestick" href="/features/trading">
+    Buy or sell tokens to adjust holdings
+  </Card>
+  <Card title="Swap" icon="arrows-rotate" href="/features/swap">
+    Rebalance your portfolio
+  </Card>
+  <Card title="Vault Staking" icon="lock" href="/features/vault-staking">
+    Earn yield on idle assets
+  </Card>
+  <Card title="AI Chat" icon="robot" href="/features/ai-chat">
+    Query portfolio using natural language
+  </Card>
+</CardGroup>

@@ -1,0 +1,357 @@
+---
+title: 'Transaction History'
+description: 'Track and manage all your trading activity on GweAI'
+---
+
+# Transaction History
+
+The Transaction History page provides a comprehensive view of all your DCA trading activities, deposits, withdrawals, swaps, and vault operations on GweAI.
+
+## Accessing Transaction History
+
+Navigate to the "Transactions" page from the main navigation menu. Your transaction history will automatically load when your wallet is connected.
+
+<Note>
+Transaction data is loaded from multiple sources including localStorage, on-chain events, and the backend API to provide a complete history.
+</Note>
+
+## Transaction Types
+
+GweAI tracks six different types of transactions:
+
+### Buy Transactions
+
+Recorded when you purchase crypto assets through the DCA trading feature.
+
+**Displayed Information**:
+- Asset name and symbol
+- Amount purchased
+- USD value at time of purchase
+- Transaction timestamp
+- Status (completed, pending, processing)
+
+### Sell Transactions
+
+Recorded when you sell crypto assets.
+
+**Displayed Information**:
+- Asset name and symbol
+- Amount sold
+- USD value at time of sale
+- Transaction timestamp
+- Status
+
+### Withdrawal Transactions
+
+Recorded when you send tokens from your wallet to external addresses.
+
+**Displayed Information**:
+- Token symbol
+- Amount withdrawn
+- Recipient address (in transaction details)
+- Transaction hash
+- Status
+
+<Tip>
+Click "View TX" next to any withdrawal to see the full transaction details on BaseScan explorer.
+</Tip>
+
+### Swap Transactions
+
+Recorded when you exchange one token for another using the platform's swap feature.
+
+**Displayed Information**:
+- Source token and amount
+- Destination token and amount
+- Exchange rate
+- Transaction hash
+- Status
+
+**Example Display**: `4.5 SOL → 89.50 USDC`
+
+### Vault Stake Transactions
+
+Recorded when you deposit tokens into yield-generating vaults.
+
+**Displayed Information**:
+- Token symbol and amount staked
+- Lock duration (in days)
+- APY percentage
+- Timestamp
+- Status
+
+**Example**: `0.5 BTC staked for 90 days @ 12.5% APY`
+
+### Vault Unstake Transactions
+
+Recorded when you withdraw tokens from vaults:
+
+- **Regular Unstake**: After lock period ends
+- **Early Unstake**: Before lock period ends (with penalty)
+
+**Displayed Information**:
+- Token symbol and amount
+- Penalty amount (for early unstakes)
+- Timestamp
+- Status
+
+<Warning>
+Early unstaking from vaults incurs a penalty. Always check the penalty amount before confirming an early withdrawal.
+</Warning>
+
+## Filtering Transactions
+
+Use the filter buttons to view specific transaction types:
+
+<Steps>
+  <Step title="Click Filter Buttons">
+    Located at the top of the transaction list, click any filter to show only that transaction type.
+  </Step>
+
+  <Step title="Available Filters">
+    - **All**: Shows all transaction types
+    - **Buy**: Shows only purchase transactions
+    - **Sell**: Shows only sale transactions
+    - **Swap**: Shows only token swaps
+    - **Withdrawal**: Shows only withdrawals
+    - **Vault**: Shows all vault-related transactions (stake, unstake, early unstake)
+  </Step>
+
+  <Step title="View Filtered Results">
+    The transaction list updates immediately to show only the selected transaction type. Pagination resets to page 1.
+  </Step>
+</Steps>
+
+<Tip>
+Filters are especially useful when you have many transactions and want to track specific activity types.
+</Tip>
+
+## Transaction Status
+
+Each transaction has a status badge indicating its current state:
+
+### Completed
+
+✅ **Green Badge**: Transaction successfully confirmed on-chain.
+
+The transaction is final and assets have been transferred.
+
+### Pending
+
+⏳ **Yellow Badge**: Transaction submitted but awaiting blockchain confirmation.
+
+This typically takes a few seconds to a few minutes depending on network congestion.
+
+### Processing
+
+🔵 **Blue Badge**: Transaction is being processed by the smart contract.
+
+This status appears for complex operations like swaps or vault transactions.
+
+<Note>
+Most transactions move from "pending" to "completed" within 15-30 seconds on Base Sepolia.
+</Note>
+
+## Pagination
+
+The transaction history displays 10 transactions per page:
+
+- Use **Previous** and **Next** buttons to navigate between pages
+- Page numbers are displayed in the center
+- Click any page number to jump directly to that page
+- Current page is highlighted in blue
+
+**Page Info**: Shows "Showing 1-10 of 45 transactions" to help you track your position in the list.
+
+## Transaction Details
+
+Each transaction row displays:
+
+| Element | Description |
+|---------|-------------|
+| **Icon** | Color-coded icon indicating transaction type |
+| **Type Badge** | Small label showing transaction type (BUY, SELL, SWAP, etc.) |
+| **Asset Name** | Full name of the primary asset |
+| **Symbol Badge** | Token symbol in monospace font |
+| **Amount** | Quantity of tokens involved |
+| **Value** | USD value or conversion details |
+| **Timestamp** | Date and time of transaction |
+| **Status Badge** | Current transaction status |
+| **View TX Link** | Opens transaction on blockchain explorer |
+
+### Icon Colors
+
+- 🟢 **Green**: Buy, Vault Unstake
+- 🔴 **Red**: Sell
+- 🔵 **Blue**: Swap
+- 🟡 **Yellow**: Vault Stake
+- 🟠 **Orange**: Vault Early Unstake
+- 🟣 **Purple**: Withdrawal
+
+## Transaction Summary Statistics
+
+At the bottom of the page, view aggregate statistics:
+
+### Total Invested
+
+Sum of all USD values from buy transactions. Shows how much you've invested in the platform.
+
+### Total Transactions
+
+Total count of all transactions across all types.
+
+### Average Transaction
+
+Average USD value of your buy transactions, helping you understand your typical investment size.
+
+<Tip>
+These statistics update automatically as new transactions are added to your history.
+</Tip>
+
+## Real vs Demo Data
+
+### Connected Wallet (Real Data)
+
+When your wallet is connected, the page displays:
+- Your actual on-chain transactions
+- Locally stored trading history
+- Real swap events from the blockchain
+- Actual vault operations
+
+### Not Connected (Demo Data)
+
+Without a connected wallet, the page shows:
+- Sample transactions for demonstration
+- Typical transaction patterns
+- Example use cases
+
+<Warning>
+Always connect your wallet to view your real transaction history. Demo data is for preview purposes only.
+</Warning>
+
+## Data Sources
+
+Transaction history is aggregated from multiple sources:
+
+1. **LocalStorage**: Trades, deposits, withdrawals, and vault operations stored locally
+2. **Blockchain Events**: On-chain swap transactions fetched via smart contract events
+3. **Backend API**: Synced transaction data from the GweAI backend
+
+<Note>
+Data is refreshed every 10 seconds to capture new transactions automatically.
+</Note>
+
+## Storage Keys
+
+Transactions are stored using wallet-specific keys:
+
+```typescript
+// Trading transactions
+`trades_{tokenAddress}_{userAddress}`
+
+// Wallet transactions (deposits/withdrawals)
+`wallet_{address}_transactions`
+
+// Vault transactions
+`vaultHistory_{address}`
+```
+
+This ensures transaction history remains isolated per wallet address.
+
+## Viewing Transaction Details
+
+To view full details of any transaction:
+
+<Steps>
+  <Step title="Find Transaction">
+    Locate the transaction in your history list. Use filters if needed.
+  </Step>
+
+  <Step title="Click View TX">
+    Click the "View TX" link on the right side of the transaction row.
+  </Step>
+
+  <Step title="BaseScan Explorer">
+    The transaction will open in BaseScan, showing:
+    - Complete transaction hash
+    - Block number and confirmations
+    - Gas used and fees paid
+    - Input data
+    - Event logs
+    - Contract interactions
+  </Step>
+</Steps>
+
+## Token Symbol Mapping
+
+Transactions display the correct token symbols:
+
+| Symbol | Full Name | Used For |
+|--------|-----------|----------|
+| ETH | Ethereum | Gas and trading |
+| BTC | Bitcoin | Trading |
+| SOL | Solana | Trading |
+| BNB | BNB | Trading |
+| XRP | Ripple | Trading |
+| TON | Toncoin | Trading |
+| AVAX | Avalanche | Trading |
+| TRX | Tron | Trading |
+| ADA | Cardano | Trading |
+| DOGE | Dogecoin | Trading |
+| USDC | USD Coin | Trading pair |
+
+<Note>
+Token symbols are automatically resolved from contract addresses to ensure accurate display.
+</Note>
+
+## Troubleshooting
+
+### No Transactions Showing
+
+**Possible Causes**:
+- Wallet not connected
+- No transactions made yet
+- LocalStorage cleared
+
+**Solutions**:
+1. Connect your wallet
+2. Make a test transaction
+3. Check filter settings (ensure "All" is selected)
+
+### Missing Recent Transactions
+
+**Possible Causes**:
+- Transaction still confirming
+- Page needs refresh
+- Sync delay
+
+**Solutions**:
+1. Wait for blockchain confirmation (15-30 seconds)
+2. Refresh the page
+3. Check transaction on BaseScan using transaction hash
+
+### Incorrect Transaction Value
+
+**Possible Causes**:
+- Price data from time of transaction
+- Token decimal conversion issue
+
+**Solutions**:
+1. Values reflect prices at time of transaction
+2. Check actual amounts on blockchain explorer
+3. Token decimals are automatically handled (no action needed)
+
+### Statistics Not Updating
+
+**Possible Causes**:
+- Page filter active
+- Cache not refreshed
+
+**Solutions**:
+1. Set filter to "All" to see complete statistics
+2. Refresh the page
+3. Statistics update automatically every 10 seconds
+
+<Tip>
+Bookmark transactions you want to reference later by saving their transaction hashes or BaseScan links.
+</Tip>

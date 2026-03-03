@@ -1,0 +1,325 @@
+---
+title: Liquidity Pool Contract
+description: Manages protocol liquidity for all supported tokens with secure deposit and withdrawal functionality
+---
+
+## Overview
+
+The Liquidity Pool contract holds all protocol liquidity and provides the reserves for token swaps executed through the Router contract.
+
+**Contract Address:** `0xDEEd6a61940bD4162f9955aeBb477C3bDABf6078`
+
+**Verification:** [View on BaseScan](https://sepolia.basescan.org/address/0xDEEd6a61940bD4162f9955aeBb477C3bDABf6078)
+
+## Key Features
+
+- Multi-token liquidity pools
+- ERC20 token deposits and withdrawals
+- Balance tracking per token
+- Integration with Router for swaps
+- Admin-controlled liquidity management
+
+## Main Functions
+
+### deposit
+
+Deposit tokens into the liquidity pool.
+
+<ParamField path="token" type="address" required>
+  Address of the ERC20 token to deposit
+</ParamField>
+
+<ParamField path="amount" type="uint256" required>
+  Amount of tokens to deposit (in token's smallest unit)
+</ParamField>
+
+<Warning>
+Tokens must be approved before calling deposit. The pool contract needs spending permission.
+</Warning>
+
+### withdraw
+
+Withdraw tokens from the liquidity pool (admin only).
+
+<ParamField path="token" type="address" required>
+  Address of the ERC20 token to withdraw
+</ParamField>
+
+<ParamField path="amount" type="uint256" required>
+  Amount of tokens to withdraw (in token's smallest unit)
+</ParamField>
+
+### poolBalance
+
+Query the current balance of a specific token in the pool.
+
+<ParamField path="token" type="address" required>
+  Address of the ERC20 token to query
+</ParamField>
+
+**Returns:**
+- `balance` (uint256) - Current pool balance for the token
+
+## Integration Example
+
+Querying pool balances:
+
+```typescript
+import { createPublicClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { VERIFIED_CONTRACTS } from '@/config/contracts';
+
+const LIQUIDITY_POOL_ADDRESS = VERIFIED_CONTRACTS.LIQUIDITY_POOL;
+
+const LIQUIDITY_POOL_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+    name: 'poolBalance',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+];
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+});
+
+// Get USDC pool balance
+const usdcBalance = await publicClient.readContract({
+  address: LIQUIDITY_POOL_ADDRESS,
+  abi: LIQUIDITY_POOL_ABI,
+  functionName: 'poolBalance',
+  args: ['0xBEE08798a3634e29F47e3d277C9d11507D55F66a'],
+});
+
+console.log('USDC Pool Balance:', formatUnits(usdcBalance, 6));
+```
+
+## Pool Composition
+
+The pool maintains reserves for all supported tokens:
+
+| Token | Typical Liquidity | APY (Staking) |
+|-------|-------------------|---------------|
+| USDC | High | 6.0% |
+| BTC | Medium | 10.0% |
+| SOL | Medium | 9.0% |
+| BNB | Low | - |
+| XRP | Low | - |
+| Other | Low | - |
+
+## Deposit Flow
+
+Depositing tokens into the pool:
+
+```typescript
+import { parseUnits } from 'viem';
+
+const tokenAddress = '0xBEE08798a3634e29F47e3d277C9d11507D55F66a'; // USDC
+const amount = parseUnits('1000', 6); // 1000 USDC
+
+// Step 1: Approve pool contract
+const approveData = `0x095ea7b3${
+  LIQUIDITY_POOL_ADDRESS.slice(2).padStart(64, '0')
+}${
+  amount.toString(16).padStart(64, '0')
+}`;
+
+const approveTx = await walletClient.sendTransaction({
+  to: tokenAddress,
+  data: approveData,
+});
+
+await publicClient.waitForTransactionReceipt({ hash: approveTx });
+
+// Step 2: Deposit tokens
+const depositData = `0x47e7ef24${
+  tokenAddress.slice(2).padStart(64, '0')
+}${
+  amount.toString(16).padStart(64, '0')
+}`;
+
+const depositTx = await walletClient.sendTransaction({
+  to: LIQUIDITY_POOL_ADDRESS,
+  data: depositData,
+});
+
+await publicClient.waitForTransactionReceipt({ hash: depositTx });
+```
+
+**Function Signature:** `deposit(address,uint256)` = `0x47e7ef24`
+
+## Withdrawal Flow
+
+Withdrawing tokens from the pool (admin only):
+
+```typescript
+const tokenAddress = '0xBEE08798a3634e29F47e3d277C9d11507D55F66a'; // USDC
+const amount = parseUnits('500', 6); // 500 USDC
+
+// withdraw(address token, uint256 amount)
+const withdrawData = `0xf3fef3a3${
+  tokenAddress.slice(2).padStart(64, '0')
+}${
+  amount.toString(16).padStart(64, '0')
+}`;
+
+const withdrawTx = await walletClient.sendTransaction({
+  to: LIQUIDITY_POOL_ADDRESS,
+  data: withdrawData,
+});
+
+await publicClient.waitForTransactionReceipt({ hash: withdrawTx });
+```
+
+**Function Signature:** `withdraw(address,uint256)` = `0xf3fef3a3`
+
+<Warning>
+Withdrawals are restricted to the contract owner (Treasury wallet). Regular users cannot withdraw directly from the pool.
+</Warning>
+
+## Router Integration
+
+The Router contract interacts with the Liquidity Pool during swaps:
+
+```typescript
+// Router flow during swap execution:
+
+// 1. Router receives input tokens from user
+// 2. Router calculates output amount based on pool reserves
+// 3. Router transfers input tokens to pool
+// 4. Router transfers output tokens from pool to user
+// 5. Router collects protocol fee
+```
+
+## Vault Staking Integration
+
+The Vault Staking contract references the Liquidity Pool:
+
+```typescript
+// Vault constructor
+constructor(
+  address _treasuryWallet,
+  address _liquidityPool  // Pool address stored in Vault
+)
+
+// Vault tracks available liquidity
+function getAvailableLiquidity(address token) 
+  public view returns (uint256)
+```
+
+Staked tokens in the Vault are separate from pool liquidity but the Vault monitors pool reserves for withdrawal availability.
+
+## Security Features
+
+### Access Control
+
+Only authorized addresses can withdraw from the pool:
+
+- **Owner:** Can withdraw any amount
+- **Router Contract:** Can facilitate swaps
+- **Regular Users:** Can only deposit
+
+### Balance Verification
+
+All operations verify sufficient pool balance:
+
+```solidity
+require(
+  poolBalance[token] >= amount,
+  "Insufficient liquidity"
+);
+```
+
+### Reentrancy Protection
+
+The contract implements reentrancy guards to prevent attacks:
+
+```solidity
+modifier nonReentrant() {
+  require(!locked, "No reentrancy");
+  locked = true;
+  _;
+  locked = false;
+}
+```
+
+## Events
+
+Monitor pool activity through emitted events:
+
+```solidity
+event Deposited(
+  address indexed user,
+  address indexed token,
+  uint256 amount
+);
+
+event Withdrawn(
+  address indexed user,
+  address indexed token,
+  uint256 amount
+);
+
+event LiquidityUpdated(
+  address indexed token,
+  uint256 newBalance
+);
+```
+
+## Admin Operations
+
+### Adding Token Support
+
+New tokens must be added to the whitelist:
+
+```typescript
+// In config/contracts.ts
+export const VERIFIED_TOKENS = {
+  USDC: '0xBEE08798a3634e29F47e3d277C9d11507D55F66a',
+  BTC: '0x7d9E31f5cCac4b9c8566f343A6bD6f3263DFcC91',
+  // Add new token
+  NEW_TOKEN: '0x...',
+};
+```
+
+### Managing Liquidity
+
+Admins can rebalance pool liquidity as needed:
+
+```typescript
+// Check current reserves
+const balances = await Promise.all(
+  Object.entries(VERIFIED_TOKENS).map(async ([symbol, address]) => {
+    const balance = await publicClient.readContract({
+      address: LIQUIDITY_POOL_ADDRESS,
+      abi: LIQUIDITY_POOL_ABI,
+      functionName: 'poolBalance',
+      args: [address],
+    });
+    return { symbol, balance };
+  })
+);
+
+console.log('Pool reserves:', balances);
+```
+
+## Gas Optimization
+
+- **Batch Operations:** Deposit multiple tokens in a single transaction
+- **Efficient Storage:** Minimal storage updates per operation
+- **Optimized ABI:** Only essential functions included in frontend
+
+## Related Contracts
+
+<CardGroup cols={2}>
+  <Card title="Router Contract" icon="arrows-rotate" href="/contracts/router">
+    Router pulls liquidity for swaps
+  </Card>
+  
+  <Card title="Vault Staking" icon="vault" href="/contracts/vault-staking">
+    Vault monitors pool liquidity
+  </Card>
+</CardGroup>

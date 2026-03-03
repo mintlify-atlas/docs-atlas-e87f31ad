@@ -1,0 +1,419 @@
+---
+title: Vault Staking Contract
+description: Time-locked staking with yield generation, penalty system, and multi-token support
+---
+
+## Overview
+
+The Vault Staking contract enables users to stake supported tokens for a fixed duration and earn yield based on token-specific APY rates and lock duration multipliers.
+
+**Contract Address:** `0xB156a66521BCB5A903daA42879A3e562E402Fa41`
+
+**Verification:** [View on BaseScan](https://sepolia.basescan.org/address/0xB156a66521BCB5A903daA42879A3e562E402Fa41)
+
+## Key Features
+
+- Time-locked staking with flexible durations (1-12 months)
+- Token-specific APY rates (BTC: 10%, SOL: 9%, USDC: 6%)
+- APY multipliers based on lock duration
+- Early withdrawal with proportional penalties
+- Emergency withdrawal mechanism
+- Pausable for security
+- Reentrancy protection
+
+## Supported Tokens
+
+Only these tokens can be staked:
+
+| Token | Address | Decimals | APY |
+|-------|---------|----------|-----|
+| BTC | `0x7d9E31f5cCac4b9c8566f343A6bD6f3263DFcC91` | 8 | 10% |
+| SOL | `0x241ECE6Dce0E0825F9992410B3fA5d4b8fC8d199` | 9 | 9% |
+| USDC | `0xBEE08798a3634e29F47e3d277C9d11507D55F66a` | 6 | 6% |
+
+## APY Multipliers
+
+Longer lock durations earn higher yields:
+
+| Lock Duration | Multiplier | Effective APY (BTC) |
+|---------------|------------|---------------------|
+| 1 month | 1.0x | 10% |
+| 3 months | 1.2x | 12% |
+| 6 months | 1.5x | 15% |
+| 12 months | 2.0x | 20% |
+
+## Main Functions
+
+### stakeToken
+
+Stake ERC20 tokens with a specified lock duration.
+
+<ParamField path="token" type="address" required>
+  Address of the token to stake (must be BTC, SOL, or USDC)
+</ParamField>
+
+<ParamField path="amount" type="uint256" required>
+  Amount of tokens to stake (in token's smallest unit)
+</ParamField>
+
+<ParamField path="lockDuration" type="uint256" required>
+  Lock duration in seconds (MIN: 30 days, MAX: 365 days)
+</ParamField>
+
+**Constants:**
+- `MIN_LOCK_DURATION`: 2,592,000 seconds (30 days)
+- `MAX_LOCK_DURATION`: 31,536,000 seconds (365 days)
+
+### stakeETH
+
+Stake native ETH (payable function).
+
+<ParamField path="lockDuration" type="uint256" required>
+  Lock duration in seconds
+</ParamField>
+
+<Warning>
+ETH staking is currently supported but not actively used in the frontend. The platform focuses on ERC20 token staking (BTC, SOL, USDC).
+</Warning>
+
+### withdraw
+
+Withdraw tokens after the lock period expires.
+
+<ParamField path="stakeId" type="uint256" required>
+  The unique ID of the stake to withdraw
+</ParamField>
+
+Withdraws the full amount including earned yield when the unlock date is reached.
+
+### withdrawEarly
+
+Withdraw tokens before the lock period expires (with penalty).
+
+<ParamField path="stakeId" type="uint256" required>
+  The unique ID of the stake to withdraw early
+</ParamField>
+
+**Penalty Calculation:**
+```solidity
+// Earned yield = (elapsed time / total time) × total yield
+earnedYield = (elapsedTime / totalLockTime) × totalYield
+
+// Penalty = unearned yield (deducted from principal)
+penalty = totalYield - earnedYield
+
+// User receives: principal - penalty
+amountAfterPenalty = principal - penalty
+```
+
+Penalties are sent to the Treasury wallet.
+
+### calculatePenalty
+
+View function to calculate early withdrawal penalty before executing.
+
+<ParamField path="stakeId" type="uint256" required>
+  The stake ID to calculate penalty for
+</ParamField>
+
+**Returns:**
+- `penalty` (uint256) - Penalty amount in tokens
+- `amountAfterPenalty` (uint256) - Amount user will receive
+
+## Stake Structure
+
+Each stake contains:
+
+```solidity
+struct Stake {
+  uint256 amount;          // Principal amount staked
+  uint256 lockDate;        // Timestamp when stake was created
+  uint256 unlockDate;      // Timestamp when stake can be withdrawn
+  uint256 lockDuration;    // Duration in seconds
+  uint256 apy;             // APY rate (with multiplier applied)
+  address token;           // Address of staked token
+  bool withdrawn;          // Whether stake has been withdrawn
+  uint256 totalYield;      // Total yield to be earned
+}
+```
+
+## Integration Example
+
+Staking tokens from the frontend:
+
+```typescript
+import { parseUnits, formatUnits } from 'viem';
+import { VAULT_STAKING_ADDRESS, TOKEN_ADDRESSES } from '@/services/vaultService';
+
+const VAULT_STAKING_ABI = [
+  {
+    inputs: [
+      { internalType: 'address', name: 'token', type: 'address' },
+      { internalType: 'uint256', name: 'amount', type: 'uint256' },
+      { internalType: 'uint256', name: 'lockDuration', type: 'uint256' },
+    ],
+    name: 'stakeToken',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+];
+
+// Stake 0.001 BTC for 6 months
+const tokenAddress = TOKEN_ADDRESSES.BTC;
+const amount = parseUnits('0.001', 8); // BTC has 8 decimals
+const lockDuration = 15_552_000; // 180 days in seconds
+
+// Step 1: Approve vault contract
+const approveData = `0x095ea7b3${
+  VAULT_STAKING_ADDRESS.slice(2).padStart(64, '0')
+}${
+  amount.toString(16).padStart(64, '0')
+}`;
+
+const approveTx = await walletClient.sendTransaction({
+  to: tokenAddress,
+  data: approveData,
+});
+
+await publicClient.waitForTransactionReceipt({ hash: approveTx });
+
+// Step 2: Stake tokens
+const stakeData = await walletClient.writeContract({
+  address: VAULT_STAKING_ADDRESS,
+  abi: VAULT_STAKING_ABI,
+  functionName: 'stakeToken',
+  args: [tokenAddress, amount, lockDuration],
+});
+```
+
+## Querying Stakes
+
+Retrieve user's stakes:
+
+```typescript
+import { getUserStakeIds, getStakeDetails } from '@/services/vaultService';
+
+// Get all stake IDs for user
+const stakeIds = await getUserStakeIds(userAddress);
+console.log('User has', stakeIds.length, 'stakes');
+
+// Get details for each stake
+for (const stakeId of stakeIds) {
+  const stake = await getStakeDetails(stakeId);
+  
+  if (stake) {
+    console.log('Stake ID:', stakeId);
+    console.log('Amount:', formatUnits(stake.amount, 8));
+    console.log('Token:', stake.token);
+    console.log('Unlock Date:', new Date(Number(stake.unlockDate) * 1000));
+    console.log('Total Yield:', formatUnits(stake.totalYield, 8));
+    console.log('Withdrawn:', stake.withdrawn);
+  }
+}
+```
+
+## Penalty Calculation Example
+
+Calculating early withdrawal penalty:
+
+```typescript
+import { calculateEarlyWithdrawalPenalty } from '@/services/vaultService';
+
+const principal = 1000; // 1000 USDC
+const lockDate = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days ago
+const unlockDate = Date.now() + 150 * 24 * 60 * 60 * 1000; // 150 days from now
+const totalYield = 50; // 50 USDC expected yield
+const currentTime = Date.now();
+
+const penalty = calculateEarlyWithdrawalPenalty(
+  principal,
+  lockDate,
+  unlockDate,
+  totalYield,
+  currentTime
+);
+
+console.log('Penalty Amount:', penalty.penalty); // Unearned yield
+console.log('Earned Yield:', penalty.earnedYield); // Proportional yield
+console.log('Penalty %:', penalty.penaltyPercentage.toFixed(2) + '%');
+console.log('You will receive:', penalty.amountAfterPenalty);
+console.log('Days remaining:', penalty.remainingDays);
+
+// Example output:
+// Penalty Amount: 41.67 USDC
+// Earned Yield: 8.33 USDC
+// Penalty %: 83.33%
+// You will receive: 958.33 USDC (1000 - 41.67)
+// Days remaining: 150
+```
+
+<Warning>
+**Critical:** Early withdrawal penalties are deducted from the principal, not just forfeiting yield. Users receive `principal - penalty`, where penalty equals unearned yield.
+</Warning>
+
+## Contract Events
+
+### Staked
+
+Emitted when tokens are staked:
+
+```solidity
+event Staked(
+  address indexed user,
+  uint256 indexed stakeId,
+  address indexed token,
+  uint256 amount,
+  uint256 lockDuration,
+  uint256 unlockDate
+);
+```
+
+### Withdrawn
+
+Emitted when tokens are withdrawn:
+
+```solidity
+event Withdrawn(
+  address indexed user,
+  uint256 indexed stakeId,
+  address indexed token,
+  uint256 amount,
+  uint256 penalty,
+  bool isEarlyWithdrawal
+);
+```
+
+### PenaltySentToTreasury
+
+Emitted when penalties are collected:
+
+```solidity
+event PenaltySentToTreasury(
+  address indexed token,
+  uint256 amount
+);
+```
+
+## Admin Functions
+
+### pause / unpause
+
+Pause all staking operations in case of emergency:
+
+```solidity
+function pause() external onlyOwner;
+function unpause() external onlyOwner;
+```
+
+### addSupportedToken / removeSupportedToken
+
+Manage which tokens can be staked:
+
+```solidity
+function addSupportedToken(address token) external onlyOwner;
+function removeSupportedToken(address token) external onlyOwner;
+```
+
+### setTokenAPY
+
+Update APY rate for a specific token:
+
+```solidity
+function setTokenAPY(address token, uint256 apy) external onlyOwner;
+```
+
+### setLiquidityPool
+
+Update the linked liquidity pool address:
+
+```solidity
+function setLiquidityPool(address newPool) external onlyOwner;
+```
+
+### updateTreasuryWallet
+
+Change the treasury wallet that receives penalties:
+
+```solidity
+function updateTreasuryWallet(address newTreasury) external onlyOwner;
+```
+
+**Current Treasury:** `0x39c0b97A8F2194fcd7396296F7697a84dd81077A`
+
+### toggleEmergencyWithdrawal
+
+Enable emergency withdrawals (bypasses time locks):
+
+```solidity
+function toggleEmergencyWithdrawal(bool enabled) external onlyOwner;
+```
+
+<Warning>
+Emergency withdrawal should only be enabled in critical situations as it allows users to bypass lock periods.
+</Warning>
+
+## Security Features
+
+### Reentrancy Protection
+
+All state-changing functions use OpenZeppelin's `ReentrancyGuard`:
+
+```solidity
+modifier nonReentrant();
+```
+
+### Pausable
+
+Contract can be paused to prevent operations:
+
+```solidity
+modifier whenNotPaused();
+```
+
+### Ownable
+
+Admin functions restricted to owner:
+
+```solidity
+modifier onlyOwner();
+```
+
+### Safe Token Transfers
+
+Uses OpenZeppelin's `SafeERC20` for secure transfers:
+
+```solidity
+using SafeERC20 for IERC20;
+```
+
+## Error Handling
+
+Common errors:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Token not supported" | Token not in whitelist | Use BTC, SOL, or USDC |
+| "Lock duration too short" | Duration < 30 days | Increase lock duration |
+| "Lock duration too long" | Duration > 365 days | Decrease lock duration |
+| "Stake not found" | Invalid stake ID | Check stake ID |
+| "Already withdrawn" | Stake already claimed | Cannot withdraw twice |
+| "EnforcedPause" | Contract paused | Wait for unpause |
+
+## Gas Optimization Tips
+
+- **Batch approvals:** Approve maximum amount once instead of per stake
+- **Query off-chain:** Use `getUserStakes` and `getStake` for read-only data
+- **Cache stake IDs:** Store stake IDs in frontend to avoid repeated queries
+
+## Related Contracts
+
+<CardGroup cols={2}>
+  <Card title="Liquidity Pool" icon="droplet" href="/contracts/liquidity-pool">
+    Vault references pool for liquidity checks
+  </Card>
+  
+  <Card title="Contract Overview" icon="list" href="/contracts/overview">
+    View all contract addresses
+  </Card>
+</CardGroup>

@@ -1,0 +1,601 @@
+---
+title: 'Token Swap'
+description: 'Instant token-to-token exchanges with real-time pricing'
+icon: 'arrows-rotate'
+---
+
+## Overview
+
+GweAI's Swap page enables direct token-to-token exchanges without intermediate steps. Swap any supported token for another using real-time market prices and automated routing.
+
+<CardGroup cols={2}>
+  <Card title="Direct Swaps" icon="bolt">
+    Trade tokens directly without selling to USDC first
+  </Card>
+  <Card title="Real-Time Quotes" icon="clock">
+    Live pricing from smart contract router
+  </Card>
+  <Card title="Automatic Routing" icon="route">
+    Optimal paths via USDC when needed
+  </Card>
+  <Card title="Transaction History" icon="list">
+    Complete record of all your swaps
+  </Card>
+</CardGroup>
+
+## Accessing Swap
+
+<Steps>
+  <Step title="Navigate to Swap">
+    Click **Swap** in the main navigation menu
+  </Step>
+  <Step title="Connect Your Wallet">
+    Click **Connect Wallet** to enable swapping
+  </Step>
+  <Step title="Select Tokens">
+    Choose the token to swap FROM and the token to receive
+  </Step>
+  <Step title="Enter Amount & Execute">
+    Input amount and click **Swap Tokens**
+  </Step>
+</Steps>
+
+<Note>
+**Network:** All swaps execute on Base Sepolia Testnet with USDC gas fees.
+</Note>
+
+## Swap Interface
+
+### Token Selection
+
+<Frame>
+  <img src="/images/swap-interface.png" alt="Swap token selection" />
+</Frame>
+
+The swap interface has two main panels:
+
+#### From Token (Sell)
+
+- **Input:** Amount to swap
+- **Selector:** Click to choose token
+- **Balance:** Shows available balance
+- **USD Value:** Calculated from input amount
+
+#### To Token (Buy)
+
+- **Output:** Estimated amount you'll receive
+- **Selector:** Click to choose token
+- **Balance:** Shows current holdings
+- **USD Value:** Calculated from output amount
+
+### Swap Button
+
+The center button between panels:
+
+- **Swap Direction:** Click 🔄 to reverse FROM/TO tokens
+- **Quick Toggle:** Instantly flips your swap
+
+## Executing a Swap
+
+<Steps>
+  <Step title="Choose FROM Token">
+    Click the FROM token dropdown
+    
+    Select the token you want to swap (e.g., BTC)
+    
+    **Your Balance:** Shows how much you have
+  </Step>
+  <Step title="Choose TO Token">
+    Click the TO token dropdown
+    
+    Select the token you want to receive (e.g., SOL)
+    
+    **Cannot be same as FROM token**
+  </Step>
+  <Step title="Enter Amount">
+    Type the amount of FROM token to swap
+    
+    Example: `0.5` (for 0.5 BTC)
+    
+    **Auto-Calculation:** TO amount updates automatically
+  </Step>
+  <Step title="Review Quote">
+    Check the swap details card:
+    ```
+    Rate: 1 BTC ≈ 324.67 SOL
+    Protocol Fee: 0.973 SOL
+    Slippage: 0.5%
+    Network Fee: ~$0.50
+    ```
+  </Step>
+  <Step title="Execute Swap">
+    Click **Swap Tokens** button
+    
+    Approve the transaction in your wallet
+  </Step>
+  <Step title="Confirmation">
+    Wait for blockchain confirmation (2-5 seconds)
+    
+    Success toast appears with transaction hash
+  </Step>
+</Steps>
+
+## Smart Contract Integration
+
+### Router Contract
+
+Swaps execute through the verified Router smart contract:
+
+```typescript
+// From useSwapContract.ts
+const ROUTER_ADDRESS = '0x...'  // Verified on BaseScan
+
+const executeSwap = async ({
+  tokenInAddress,   // FROM token contract
+  tokenOutAddress,  // TO token contract
+  amountIn,         // Amount to swap
+  tokenInDecimals,  // Token decimals (6, 8, or 18)
+  tokenOutDecimals, // Output token decimals
+  slippageBps       // 50 = 0.5%
+}) => {
+  // Step 1: Get quote from router
+  const quote = await getSwapQuote(params);
+  
+  // Step 2: Approve token spending (if first time)
+  if (currentAllowance < amountIn) {
+    await approveRouter();
+  }
+  
+  // Step 3: Execute swap
+  const txHash = await router.swap(
+    tokenInAddress,
+    tokenOutAddress,
+    amountIn,
+    minAmountOut  // Protected by slippage
+  );
+  
+  return txHash;
+};
+```
+
+### Approval Flow
+
+<AccordionGroup>
+  <Accordion title="First-Time Approval" icon="shield-check">
+    **Why Needed:**
+    
+    ERC-20 tokens require explicit permission for contracts to transfer them.
+    
+    **Process:**
+    ```typescript
+    // Check current allowance
+    const allowance = await token.allowance(userAddress, routerAddress);
+    
+    if (allowance < amountToSwap) {
+      // Request unlimited approval (better UX)
+      await token.approve(routerAddress, maxUint256);
+    }
+    ```
+    
+    **Benefit:** You only approve once, then future swaps skip this step.
+  </Accordion>
+
+  <Accordion title="Swap Execution" icon="bolt">
+    **After Approval:**
+    
+    The actual swap transaction:
+    
+    ```typescript
+    const swapData = `0xfe029156${  // swap() selector
+      tokenInAddress.slice(2).padStart(64, '0')  // FROM token
+    }${
+      tokenOutAddress.slice(2).padStart(64, '0') // TO token
+    }${
+      amountIn.toString(16).padStart(64, '0')    // Amount in
+    }${
+      minAmountOut.toString(16).padStart(64, '0') // Min out
+    }`;
+    
+    await walletClient.sendTransaction({
+      to: ROUTER_ADDRESS,
+      data: swapData
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Confirmation & Balance Update" icon="check">
+    **Post-Swap:**
+    
+    ```typescript
+    // Wait for blockchain confirmation
+    await publicClient.waitForTransactionReceipt({
+      hash: txHash,
+      confirmations: 1
+    });
+    
+    // Refresh wallet balances
+    await refreshBalance();
+    
+    // Show success notification
+    showSuccessToast('Swap Complete!', 'Tokens swapped successfully');
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Pricing & Quotes
+
+### Real-Time Quote Fetching
+
+Quotes are fetched from the router contract:
+
+```typescript
+// From useSwapContract.ts
+const getSwapQuote = async (params) => {
+  const [amountOut, protocolFee] = await publicClient.readContract({
+    address: ROUTER_ADDRESS,
+    abi: routerAbi,
+    functionName: 'getQuote',
+    args: [
+      tokenInAddress,
+      tokenOutAddress,
+      amountInWei
+    ]
+  });
+  
+  return {
+    amountOut: formatUnits(amountOut, tokenOutDecimals),
+    protocolFee: formatUnits(protocolFee, tokenOutDecimals),
+    route: tokenInAddress === USDC || tokenOutAddress === USDC 
+      ? 'Direct' 
+      : 'Via USDC'
+  };
+};
+```
+
+### Slippage Protection
+
+All swaps include automatic slippage protection:
+
+```typescript
+// Calculate minimum output with 0.5% slippage
+const expectedOut = parseUnits(quote.amountOut, tokenOutDecimals);
+const minAmountOut = (expectedOut * BigInt(9950)) / BigInt(10000);
+// 9950/10000 = 99.5% of expected = 0.5% slippage tolerance
+```
+
+<Warning>
+**Slippage Failure:** If the actual output falls below `minAmountOut`, the transaction reverts. This protects you from unfavorable price movements.
+</Warning>
+
+### Price Updates
+
+Prices refresh automatically:
+
+- **On Amount Change:** New quote fetched with 500ms debounce
+- **Every 30 Seconds:** Background price refresh
+- **Manual Refresh:** Click the 🔄 button
+
+## Supported Tokens
+
+You can swap between these tokens:
+
+| Token | Symbol | Decimals | Notes |
+|-------|--------|----------|-------|
+| Bitcoin | BTC | 8 | Wrapped BTC |
+| Ethereum | ETH | 18 | Display only |
+| Solana | SOL | 9 | |
+| BNB Chain | BNB | 18 | |
+| Ripple | XRP | 6 | |
+| Toncoin | TON | 9 | |
+| Avalanche | AVAX | 18 | |
+| TRON | TRX | 6 | |
+| Cardano | ADA | 6 | |
+| Dogecoin | DOGE | 8 | |
+| USD Coin | USDC | 6 | Stablecoin |
+
+<Info>
+**ETH Status:** Ethereum is currently display-only and cannot be traded. If you select ETH, you'll see an error message.
+</Info>
+
+## Routing Logic
+
+### Direct Swaps
+
+Some pairs swap directly:
+
+- **BTC ↔ USDC** - Direct pool
+- **SOL ↔ USDC** - Direct pool
+- **Any Token ↔ USDC** - Direct pool
+
+### Routed Swaps
+
+Other pairs route through USDC:
+
+```
+BTC → SOL
+  ↓
+BTC → USDC → SOL
+  (swap 1)  (swap 2)
+```
+
+**Example:**
+- Swap 0.5 BTC for SOL
+- Router converts: 0.5 BTC → 22,500 USDC → 161.87 SOL
+- You receive: ~161.87 SOL (minus fees)
+
+## Transaction History
+
+### Your Swap Records
+
+The Swap page shows your complete transaction history:
+
+<Frame>
+  <img src="/images/swap-history.png" alt="Swap transaction history" />
+</Frame>
+
+**Columns:**
+- **Pair:** Token symbols with direction arrow
+- **Amount In:** Tokens you swapped
+- **Amount Out:** Tokens you received
+- **Time:** Transaction timestamp
+- **Tx Hash:** Link to blockchain explorer
+
+### Fetching History
+
+History is fetched directly from the blockchain:
+
+```typescript
+// From useSwapTransactions.ts
+const { transactions, loading } = useSwapTransactions(
+  userAddress,  // Only your swaps
+  connected     // Only when wallet connected
+);
+
+// Fetches Swap events from Router contract
+const logs = await publicClient.getLogs({
+  address: ROUTER_ADDRESS,
+  event: {
+    name: 'Swap',
+    inputs: [
+      { name: 'user', type: 'address', indexed: true },
+      { name: 'tokenIn', type: 'address' },
+      { name: 'tokenOut', type: 'address' },
+      { name: 'amountIn', type: 'uint256' },
+      { name: 'amountOut', type: 'uint256' }
+    ]
+  },
+  args: {
+    user: userAddress  // Filter to your address
+  },
+  fromBlock: 'earliest'
+});
+```
+
+### Pagination
+
+- **10 swaps per page**
+- **Previous/Next navigation**
+- **Total count displayed**
+
+## Fees & Costs
+
+### Fee Breakdown
+
+| Fee Type | Amount | Description |
+|----------|--------|-------------|
+| **Protocol Fee** | 0.3% | Taken from output amount |
+| **Gas Fee** | ~$0.01-0.50 | Paid in USDC |
+| **Slippage** | Up to 0.5% | Price protection buffer |
+
+**Example Swap:**
+```
+Swapping: 100 USDC → SOL
+Expected Out: 0.7194 SOL
+Protocol Fee: 0.0022 SOL (0.3%)
+Actual Received: 0.7172 SOL
+Gas Fee: 0.15 USDC
+```
+
+### Fee Optimization
+
+<CardGroup cols={2}>
+  <Card title="Unlimited Approvals" icon="infinity">
+    Approve once, swap forever - saves gas
+  </Card>
+  <Card title="Batch Swaps" icon="layer-group">
+    Combine multiple small swaps into larger ones
+  </Card>
+  <Card title="Direct Routes" icon="route">
+    Token ↔ USDC swaps are cheapest
+  </Card>
+  <Card title="Off-Peak Trading" icon="clock">
+    Lower gas during low network activity
+  </Card>
+</CardGroup>
+
+## Buy USDC Modal
+
+If you don't have USDC for swaps or gas:
+
+<Steps>
+  <Step title="Click 'Buy' Tab">
+    Switch from Swap to Buy tab in the interface
+  </Step>
+  <Step title="Buy USDC Modal Opens">
+    Shows options to acquire USDC:
+    - On-ramp providers (MoonPay, Transak)
+    - Exchange transfers
+    - Faucets (testnet only)
+  </Step>
+  <Step title="Follow Instructions">
+    Complete USDC purchase through selected method
+  </Step>
+  <Step title="Return to Swap">
+    Once USDC arrives, return to Swap tab
+  </Step>
+</Steps>
+
+## Security Features
+
+<CardGroup cols={2}>
+  <Card title="Verified Contracts" icon="shield-check">
+    All token and router contracts verified on BaseScan
+  </Card>
+  <Card title="Token Whitelist" icon="list-check">
+    Only approved tokens can be swapped
+  </Card>
+  <Card title="Slippage Guards" icon="shield">
+    Transactions revert if price moves unfavorably
+  </Card>
+  <Card title="Non-Custodial" icon="key">
+    You always control your private keys
+  </Card>
+</CardGroup>
+
+### Contract Validation
+
+```typescript
+// From useSwapContract.ts
+if (!isVerifiedToken(tokenInAddress)) {
+  throw new Error('Input token not in whitelist');
+}
+
+if (!isVerifiedToken(tokenOutAddress)) {
+  throw new Error('Output token not in whitelist');
+}
+
+const validation = await validateTransaction({
+  contractAddress: ROUTER_ADDRESS,
+  contractType: 'ROUTER',
+  userAddress: address
+});
+
+if (!validation.valid) {
+  throw new Error(validation.error);
+}
+```
+
+## Troubleshooting
+
+### "Insufficient Balance" Error
+
+**Cause:** Not enough of the FROM token
+
+**Solution:**
+1. Check balance shown under FROM token
+2. Reduce swap amount
+3. Buy or deposit more tokens
+
+### "ETH Trading Disabled" Error
+
+**Cause:** ETH is currently not supported for swaps
+
+**Solution:**
+- Choose a different token (BTC, SOL, etc.)
+- Use the Trading page for ETH (view-only)
+
+### "Swap Failed" - Slippage Error
+
+**Cause:** Price moved beyond 0.5% tolerance
+
+**Solution:**
+1. Wait a few seconds and retry
+2. Reduce swap amount
+3. If persistent, market is highly volatile
+
+### Quote Not Updating
+
+**Cause:** Network or API issue
+
+**Solution:**
+1. Click the refresh 🔄 button
+2. Change amount slightly to trigger recalculation
+3. Check internet connection
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Check Quotes First" icon="magnifying-glass">
+    Always review the estimated output before swapping
+    
+    Compare with current market prices
+  </Accordion>
+
+  <Accordion title="Start Small" icon="flask">
+    Test with small amounts first
+    
+    Verify the swap process works as expected
+  </Accordion>
+
+  <Accordion title="Monitor Fees" icon="money-bill">
+    Protocol fees add up on frequent swaps
+    
+    Batch swaps when possible
+  </Accordion>
+
+  <Accordion title="Understand Routing" icon="route">
+    Direct swaps (to/from USDC) are cheaper
+    
+    Token → Token may cost more due to routing
+  </Accordion>
+
+  <Accordion title="Save Transaction Hashes" icon="bookmark">
+    Keep records for tax purposes
+    
+    Download or screenshot swap confirmations
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+### Token Logos & Metadata
+
+All tokens use centralized configuration:
+
+```typescript
+// From tokens.ts
+export const TOKENS = {
+  BTC: {
+    symbol: 'BTC',
+    name: 'Bitcoin',
+    logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/1.png',
+    decimals: 8,
+    coinGeckoId: 'bitcoin'
+  },
+  // ... other tokens
+};
+```
+
+### Amount Formatting
+
+Amounts are formatted based on token decimals:
+
+```typescript
+// From SwapPage.tsx
+const formatTokenAmount = (amount: string, symbol: string): string => {
+  const decimals = TOKENS[symbol]?.decimals || 18;
+  const formatted = formatUnits(BigInt(amount), decimals);
+  return parseFloat(formatted).toFixed(
+    decimals === 6 ? 2 :   // USDC: 2 decimals
+    decimals === 8 ? 8 :   // BTC: 8 decimals
+    4                      // Others: 4 decimals
+  );
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Trading" icon="chart-candlestick" href="/features/trading">
+    Advanced trading with charts
+  </Card>
+  <Card title="Portfolio" icon="wallet" href="/features/portfolio">
+    Track your holdings
+  </Card>
+  <Card title="AI Chat" icon="robot" href="/features/ai-chat">
+    Swap using natural language
+  </Card>
+  <Card title="Vault Staking" icon="lock" href="/features/vault-staking">
+    Earn yield on swapped tokens
+  </Card>
+</CardGroup>

@@ -1,0 +1,605 @@
+---
+title: 'Portfolio Service API'
+description: 'Read-only blockchain portfolio data fetching and formatting'
+icon: 'wallet'
+---
+
+## Overview
+
+The Portfolio Service provides safe, read-only access to user wallet balances by querying public blockchain data. It supports multiple tokens on Base Sepolia testnet and formats data for AI chat responses.
+
+<Warning>
+  **Security Note**: This service only reads public blockchain data. It has NO ACCESS to private keys, mnemonics, or signing capabilities.
+</Warning>
+
+---
+
+## Core Functions
+
+### getUserPortfolio
+
+Fetches complete portfolio data for a connected wallet address.
+
+<ParamField path="address" type="string" required>
+  User's wallet address (Ethereum format: 0x...)
+</ParamField>
+
+<ResponseField name="portfolio" type="Promise<PortfolioData>">
+  Complete portfolio data including balances and prices
+</ResponseField>
+
+#### PortfolioData Interface
+
+```typescript
+interface PortfolioData {
+  totalBalanceUSD: string;      // Total portfolio value in USD
+  tokens: TokenBalance[];       // Array of token holdings
+  walletAddress: string;        // User's wallet address
+}
+
+interface TokenBalance {
+  symbol: string;               // Token symbol (BTC, ETH, SOL, etc.)
+  balance: string;              // Token amount (formatted)
+  balanceUSD: string;           // USD value
+  price: string;                // Current token price in USD
+  logo: string;                 // Token logo URL/path
+}
+```
+
+#### Example Usage
+
+```typescript
+import { getUserPortfolio } from './services/portfolioService';
+
+// Fetch user portfolio
+const portfolio = await getUserPortfolio('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1');
+
+console.log(portfolio);
+// Output:
+// {
+//   totalBalanceUSD: "15234.56",
+//   tokens: [
+//     {
+//       symbol: "BTC",
+//       balance: "0.15000000",
+//       balanceUSD: "10177.20",
+//       price: "67848.00",
+//       logo: "/tokens/btc.svg"
+//     },
+//     {
+//       symbol: "ETH",
+//       balance: "1.5000",
+//       balanceUSD: "4995.00",
+//       price: "3330.00",
+//       logo: "/tokens/eth.svg"
+//     },
+//     // ... other tokens
+//   ],
+//   walletAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1"
+// }
+```
+
+#### Implementation Details
+
+<CodeGroup>
+```typescript Blockchain Reading (Line 34-44)
+import { createPublicClient, http, fallback, erc20Abi, formatUnits } from 'viem';
+import { baseSepolia } from 'viem/chains';
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: fallback([
+    http('https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP'),
+    http('https://base-sepolia.blockpi.network/v1/rpc/public'),
+    http('https://base-sepolia-rpc.publicnode.com'),
+  ]),
+});
+```
+
+```typescript Balance Fetching (Line 49-62)
+for (const [symbol, tokenAddress] of Object.entries(VERIFIED_TOKENS)) {
+  const tokenConfig = TOKENS[symbol];
+  if (!tokenConfig) continue;
+  
+  // Read token balance (PUBLIC DATA - SAFE)
+  const balance = await publicClient.readContract({
+    address: tokenAddress as `0x${string}`,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [address as `0x${string}`],
+  }) as bigint;
+  
+  const balanceFormatted = formatUnits(balance, tokenConfig.decimals);
+  const balanceFloat = parseFloat(balanceFormatted);
+  // ...
+}
+```
+
+```typescript Price Fetching (Line 67-80)
+if (balanceFloat > 0) {
+  // Get price from Binance (faster & more reliable)
+  let price = 0;
+  try {
+    const binanceSymbol = `${symbol}USDT`;
+    const priceResponse = await fetch(
+      `https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`
+    );
+    if (priceResponse.ok) {
+      const priceData = await priceResponse.json();
+      price = parseFloat(priceData.price) || 0;
+    }
+  } catch {
+    console.warn(`Binance price fetch failed for ${symbol}`);
+  }
+  
+  const balanceUSD = balanceFloat * price;
+  totalUSD += balanceUSD;
+}
+```
+</CodeGroup>
+
+#### Supported Tokens
+
+All tokens from `VERIFIED_TOKENS` config:
+
+- **BTC**: Bitcoin (8 decimals)
+- **ETH**: Ethereum (18 decimals)
+- **SOL**: Solana (9 decimals)
+- **BNB**: Binance Coin (18 decimals)
+- **USDC**: USD Coin (6 decimals)
+- **AVAX**: Avalanche (18 decimals)
+- **XRP**: Ripple (6 decimals)
+- **TON**: Toncoin (9 decimals)
+- **DOGE**: Dogecoin (8 decimals)
+- **ADA**: Cardano (6 decimals)
+- **TRX**: Tron (6 decimals)
+
+---
+
+### formatPortfolioForAI
+
+Formats portfolio data into markdown for AI chat responses.
+
+<ParamField path="portfolio" type="PortfolioData" required>
+  Portfolio data object from `getUserPortfolio()`
+</ParamField>
+
+<ResponseField name="formatted" type="string">
+  Markdown-formatted portfolio summary
+</ResponseField>
+
+#### Example Output
+
+```typescript
+const portfolio = await getUserPortfolio(address);
+const formatted = formatPortfolioForAI(portfolio);
+
+console.log(formatted);
+// Output:
+`📊 **Your Portfolio** (0x742d...bEb1)
+
+💰 **Total Balance:** $15234.56
+
+**Holdings:**
+1. **BTC**: 0.15000000 ($10177.20)
+   Price: $67848.00
+2. **ETH**: 1.5000 ($4995.00)
+   Price: $3330.00
+3. **SOL**: 10.0000 ($2150.00)
+   Price: $215.00
+
+---
+_Data is read from blockchain. Prices from Binance API (real-time)._`
+```
+
+#### Implementation
+
+```typescript portfolioService.ts (Line 113-131)
+export function formatPortfolioForAI(portfolio: PortfolioData): string {
+  if (!portfolio.tokens.length) {
+    return `Your wallet is currently empty. No tokens found at address ${maskAddress(portfolio.walletAddress)}.`;
+  }
+
+  let response = `📊 **Your Portfolio** (${maskAddress(portfolio.walletAddress)})\n\n`;
+  response += `💰 **Total Balance:** $${portfolio.totalBalanceUSD}\n\n`;
+  response += `**Holdings:**\n`;
+
+  portfolio.tokens.forEach((token, index) => {
+    response += `${index + 1}. **${token.symbol}**: ${token.balance} ($${token.balanceUSD})\n`;
+    response += `   Price: $${token.price}\n`;
+  });
+
+  response += `\n---\n`;
+  response += `_Data is read from blockchain. Prices from Binance API (real-time)._`;
+
+  return response;
+}
+```
+
+---
+
+### formatTokenBalance
+
+Formats specific token balance for targeted queries.
+
+<ParamField path="portfolio" type="PortfolioData" required>
+  Portfolio data object
+</ParamField>
+
+<ParamField path="tokenSymbol" type="string" required>
+  Token symbol to format (BTC, ETH, SOL, etc.)
+</ParamField>
+
+<ResponseField name="formatted" type="string">
+  Markdown-formatted token balance
+</ResponseField>
+
+#### Example Usage
+
+```typescript
+const portfolio = await getUserPortfolio(address);
+const btcBalance = formatTokenBalance(portfolio, 'BTC');
+
+console.log(btcBalance);
+// Output:
+`💰 **BTC Balance**
+
+Amount: 0.15000000 BTC
+Value: $10177.20
+Current Price: $67848.00
+
+_Data from blockchain (0x742d...bEb1)_`
+```
+
+#### Implementation
+
+```typescript portfolioService.ts (Line 180-192)
+export function formatTokenBalance(portfolio: PortfolioData, tokenSymbol: string): string {
+  const token = portfolio.tokens.find(t => t.symbol === tokenSymbol);
+  
+  if (!token) {
+    return `You don't have any ${tokenSymbol} in your wallet. Your ${tokenSymbol} balance is 0.`;
+  }
+
+  return `💰 **${token.symbol} Balance**\n\n` +
+         `Amount: ${token.balance} ${token.symbol}\n` +
+         `Value: $${token.balanceUSD}\n` +
+         `Current Price: $${token.price}\n\n` +
+         `_Data from blockchain (${maskAddress(portfolio.walletAddress)})_`;
+}
+```
+
+---
+
+## Helper Functions
+
+### isPortfolioQuery
+
+Detects if user message is asking about portfolio/balance.
+
+<ParamField path="message" type="string" required>
+  User's message to analyze
+</ParamField>
+
+<ResponseField name="isPortfolio" type="boolean">
+  `true` if message is a portfolio query, `false` otherwise
+</ResponseField>
+
+#### Detection Patterns
+
+```typescript portfolioService.ts (Line 144-149)
+export function isPortfolioQuery(message: string): boolean {
+  const portfolioKeywords = /(my portfolio|my balance|my wallet|holdings|how much|how many|kitna|kitne|balance check|show balance|check.*balance|what.*balance)/i;
+  const specificTokenQuery = /(how much|how many|kitna|kitne|do i have|i have) (btc|eth|sol|bnb|usdc)/i;
+  
+  return portfolioKeywords.test(message) || specificTokenQuery.test(message);
+}
+```
+
+#### Examples
+
+```typescript
+isPortfolioQuery("How much BTC do I have?")        // → true
+isPortfolioQuery("Show my portfolio")              // → true
+isPortfolioQuery("What's my ETH balance?")         // → true
+isPortfolioQuery("Kitna SOL hai?")                 // → true (Hindi)
+isPortfolioQuery("Buy $100 of BTC")                // → false
+isPortfolioQuery("What's BTC price?")              // → false
+```
+
+---
+
+### extractTokenQuery
+
+Extracts specific token symbol from user query.
+
+<ParamField path="message" type="string" required>
+  User's message to parse
+</ParamField>
+
+<ResponseField name="token" type="string | null">
+  Token symbol (BTC, ETH, etc.) or null if not found
+</ResponseField>
+
+#### Token Mapping
+
+```typescript portfolioService.ts (Line 154-175)
+export function extractTokenQuery(message: string): string | null {
+  const match = message.match(/(btc|eth|sol|bnb|usdc|avax|xrp|ton|doge|ada|trx|bitcoin|ethereum|solana)/i);
+  
+  if (!match) return null;
+  
+  const token = match[1].toLowerCase();
+  const tokenMap: Record<string, string> = {
+    'bitcoin': 'BTC', 'btc': 'BTC',
+    'ethereum': 'ETH', 'eth': 'ETH',
+    'solana': 'SOL', 'sol': 'SOL',
+    'binance': 'BNB', 'bnb': 'BNB',
+    'ripple': 'XRP', 'xrp': 'XRP',
+    'toncoin': 'TON', 'ton': 'TON',
+    'avalanche': 'AVAX', 'avax': 'AVAX',
+    'dogecoin': 'DOGE', 'doge': 'DOGE',
+    'cardano': 'ADA', 'ada': 'ADA',
+    'tron': 'TRX', 'trx': 'TRX',
+    'usdc': 'USDC'
+  };
+  
+  return tokenMap[token] || null;
+}
+```
+
+#### Examples
+
+```typescript
+extractTokenQuery("How much BTC do I have?")       // → "BTC"
+extractTokenQuery("Show my ethereum balance")      // → "ETH"
+extractTokenQuery("Check SOL holdings")            // → "SOL"
+extractTokenQuery("What's my portfolio worth?")   // → null
+```
+
+---
+
+### maskAddress
+
+Masks wallet address for privacy (internal utility).
+
+```typescript portfolioService.ts (Line 136-139)
+function maskAddress(address: string): string {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+// Example:
+maskAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1')
+// → "0x742d...bEb1"
+```
+
+---
+
+## Integration with DCAPage
+
+### Portfolio Query Flow
+
+```typescript DCAPage.tsx (Line 479-537)
+const handleSendMessage = async (e: React.FormEvent) => {
+  // 1. Route query
+  debugRoute(userInput);
+  const route = routeQuery(userInput);
+  
+  // 2. Detect trade keywords
+  const hasTradeKeyword = /(buy|sell|swap|trade)/i.test(userInput);
+  
+  // 3. Handle portfolio queries (skip AI)
+  if (!hasTradeKeyword && (route.type === 'portfolio' || isPortfolioQuery(userInput))) {
+    if (!isConnected || !address) {
+      const walletMessage = {
+        id: generateChatId(),
+        text: '🔒 Please connect your wallet first to view your portfolio.',
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, walletMessage]);
+      setIsTyping(false);
+      return;
+    }
+    
+    try {
+      // Fetch portfolio data (READ-ONLY)
+      const portfolio = await getUserPortfolio(address);
+      const specificToken = extractTokenQuery(userInput);
+      
+      // Track mentioned token for context
+      if (specificToken) {
+        setLastMentionedToken(specificToken);
+        console.log(`🎯 Tracking token context: ${specificToken}`);
+      }
+      
+      // Format response
+      let responseText: string;
+      if (specificToken) {
+        responseText = formatTokenBalance(portfolio, specificToken);
+      } else {
+        responseText = formatPortfolioForAI(portfolio);
+      }
+      
+      // Display immediately (no AI delay)
+      setTimeout(() => {
+        const portfolioMessage = {
+          id: generateChatId(),
+          text: responseText,
+          sender: 'ai',
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, portfolioMessage]);
+        addMessageToConversation(chatId, portfolioMessage, address);
+        setIsTyping(false);
+      }, 1500);
+      
+      return;
+    } catch (error) {
+      console.error('Portfolio fetch error:', error);
+      const errorMessage = {
+        id: generateChatId(),
+        text: '❌ Unable to fetch portfolio data. Please try again.',
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setIsTyping(false);
+      return;
+    }
+  }
+  
+  // ... continue with other query types
+};
+```
+
+---
+
+## Error Handling
+
+<CodeGroup>
+```typescript No Wallet Connected
+if (!address) {
+  throw new Error('Wallet address required');
+}
+```
+
+```typescript Network Errors
+try {
+  const balance = await publicClient.readContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [address],
+  });
+} catch (error) {
+  console.error(`Error fetching balance for ${symbol}:`, error);
+  // Continue with next token
+}
+```
+
+```typescript Price Fetch Failures
+try {
+  const priceResponse = await fetch(
+    `https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`
+  );
+  if (priceResponse.ok) {
+    const priceData = await priceResponse.json();
+    price = parseFloat(priceData.price) || 0;
+  }
+} catch {
+  console.warn(`Binance price fetch failed for ${symbol}`);
+  // Continue with price = 0
+}
+```
+</CodeGroup>
+
+---
+
+## RPC Configuration
+
+The service uses **fallback RPC providers** for reliability:
+
+```typescript
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: fallback([
+    http('https://base-sepolia.g.alchemy.com/v2/-mGklZw8tTiO9fg9sRGQP', { timeout: 8000 }),
+    http('https://base-sepolia.blockpi.network/v1/rpc/public', { timeout: 8000 }),
+    http('https://base-sepolia-rpc.publicnode.com', { timeout: 8000 }),
+  ]),
+});
+```
+
+<Info>
+  **Fallback Logic**: If primary RPC fails, automatically switches to next provider in the list.
+</Info>
+
+---
+
+## Performance Optimization
+
+<Card title="Parallel Fetching" icon="bolt">
+  Token balances are fetched in parallel using async iteration, reducing total fetch time.
+</Card>
+
+<Card title="Zero Balance Skip" icon="filter">
+  Tokens with zero balance are excluded from results, reducing response payload size.
+</Card>
+
+<Card title="Sorted by Value" icon="arrow-down-wide-short">
+  Tokens are sorted by USD value (highest first) for better UX.
+</Card>
+
+```typescript portfolioService.ts (Line 98-101)
+return {
+  totalBalanceUSD: totalUSD.toFixed(2),
+  tokens: tokens.sort((a, b) => parseFloat(b.balanceUSD) - parseFloat(a.balanceUSD)),
+  walletAddress: address
+};
+```
+
+---
+
+## Security Considerations
+
+<Warning>
+  **Read-Only Access**: This service only reads public blockchain data using `balanceOf()` calls. It cannot:
+  - Access private keys
+  - Sign transactions
+  - Transfer funds
+  - Modify wallet state
+</Warning>
+
+<Check>
+  **Safe Operations**:
+  - Reading ERC-20 token balances (public data)
+  - Fetching prices from Binance API (public)
+  - Formatting data for display
+</Check>
+
+---
+
+## Language Support
+
+- **English**: Full support for all portfolio queries
+- **Hindi/Hinglish**: Supported patterns include "kitna", "kitne", "mere pass", "dikhao"
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Check Wallet Connection">
+    Verify wallet is connected before calling `getUserPortfolio()`:
+    ```typescript
+    if (!isConnected || !address) {
+      throw new Error('Wallet not connected');
+    }
+    const portfolio = await getUserPortfolio(address);
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Specific Token Queries When Possible">
+    For better UX, detect specific token queries and use `formatTokenBalance()`:
+    ```typescript
+    const specificToken = extractTokenQuery(userInput);
+    if (specificToken) {
+      return formatTokenBalance(portfolio, specificToken);
+    }
+    return formatPortfolioForAI(portfolio);
+    ```
+  </Accordion>
+  
+  <Accordion title="Track Token Context for Contextual Commands">
+    Store mentioned tokens for follow-up commands:
+    ```typescript
+    const specificToken = extractTokenQuery(userInput);
+    if (specificToken) {
+      setLastMentionedToken(specificToken);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

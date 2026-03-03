@@ -1,0 +1,971 @@
+---
+title: 'Wallet Hooks'
+description: 'React hooks for wallet management, transactions, and balances'
+icon: 'wallet'
+---
+
+## Overview
+
+GweAI provides three specialized wallet hooks built on top of Dynamic SDK for comprehensive Web3 wallet functionality.
+
+<CardGroup cols={3}>
+  <Card title="useComprehensiveWallet" icon="layer-group">
+    Full-featured wallet with multi-wallet support, balance tracking, and transaction management
+  </Card>
+  <Card title="useAgwWallet" icon="shield">
+    Production-ready wallet hook with embedded wallet support and 10+ token balances
+  </Card>
+  <Card title="useDynamicWallet" icon="bolt">
+    Lightweight wallet hook for basic wallet operations
+  </Card>
+</CardGroup>
+
+---
+
+## useComprehensiveWallet
+
+Comprehensive wallet hook using Dynamic SDK with multi-wallet support, balance tracking, and transaction management.
+
+### Import
+
+```typescript
+import { useComprehensiveWallet } from '@/hooks/useComprehensiveWallet';
+```
+
+### Usage
+
+```typescript
+function MyComponent() {
+  const {
+    connected,
+    address,
+    balances,
+    connect,
+    disconnect,
+    sendTransaction,
+    sendToken,
+    refreshBalances,
+  } = useComprehensiveWallet();
+
+  return (
+    <div>
+      {connected ? (
+        <>
+          <p>Address: {address}</p>
+          <p>ETH Balance: {balances.eth}</p>
+          <p>USDC Balance: {balances.usdc}</p>
+          <button onClick={disconnect}>Disconnect</button>
+        </>
+      ) : (
+        <button onClick={connect}>Connect Wallet</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Return Values
+
+#### Connection State
+
+<ResponseField name="connected" type="boolean">
+  Whether wallet is connected and authenticated
+</ResponseField>
+
+<ResponseField name="isLoggedIn" type="boolean">
+  Whether user is logged in via Dynamic
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Whether wallet operation is in progress
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if operation failed
+</ResponseField>
+
+<ResponseField name="sdkHasLoaded" type="boolean">
+  Whether Dynamic SDK has finished loading
+</ResponseField>
+
+#### Wallet Information
+
+<ResponseField name="address" type="string | undefined">
+  Connected wallet address (0x...)
+</ResponseField>
+
+<ResponseField name="primaryWallet" type="Wallet | null">
+  Primary wallet object from Dynamic SDK
+</ResponseField>
+
+<ResponseField name="userWallets" type="Wallet[]">
+  All connected wallets (multi-wallet support)
+</ResponseField>
+
+<ResponseField name="user" type="User | null">
+  User profile from Dynamic
+</ResponseField>
+
+#### Network Information
+
+<ResponseField name="chainId" type="number">
+  Current chain ID (defaults to Base Sepolia: 84532)
+</ResponseField>
+
+<ResponseField name="chainName" type="string">
+  Current chain name (e.g., "Base Sepolia")
+</ResponseField>
+
+<ResponseField name="network" type="number">
+  Network ID from Dynamic context
+</ResponseField>
+
+<ResponseField name="networkConfigurations" type="NetworkConfig[]">
+  Available network configurations
+</ResponseField>
+
+#### Balances
+
+<ResponseField name="balances" type="WalletBalance">
+  Token balances object containing:
+  - `eth`: ETH balance (18 decimals)
+  - `usdc`: USDC balance (6 decimals)
+  - `btc`: BTC balance (8 decimals)
+  - `totalUSD`: Total portfolio value in USD
+</ResponseField>
+
+<ResponseField name="isRefreshing" type="boolean">
+  Whether balances are currently being refreshed
+</ResponseField>
+
+<ResponseField name="getAllTokenBalances" type="() => TokenBalance[]">
+  Returns array of all token balances with metadata
+</ResponseField>
+
+<ResponseField name="getTokenBalance" type="(tokenAddress: string, decimals?: number) => Promise<string>">
+  Fetch balance for specific ERC20 token
+</ResponseField>
+
+#### Token Addresses
+
+<ResponseField name="tokenAddresses" type="object">
+  Token contract addresses:
+  - `USDC`: `0xBEE08798a3634e29F47e3d277C9d11507D55F66a`
+  - `BTC`: `0xD8a6E3FCA403d79b6AD6216b60527F51cc967D39`
+</ResponseField>
+
+<ResponseField name="tokens" type="object">
+  Token configurations with decimals and metadata
+</ResponseField>
+
+### Methods
+
+#### connect()
+
+Open Dynamic auth flow to connect wallet.
+
+```typescript
+const { connect } = useComprehensiveWallet();
+
+await connect();
+```
+
+#### disconnect()
+
+Disconnect wallet and clear balances.
+
+```typescript
+const { disconnect } = useComprehensiveWallet();
+
+await disconnect();
+```
+
+#### sendTransaction()
+
+Send ETH transaction.
+
+<ParamField path="params" type="TransactionParams" required>
+  Transaction parameters
+</ParamField>
+
+<ParamField path="params.to" type="string" required>
+  Recipient address
+</ParamField>
+
+<ParamField path="params.value" type="string">
+  Amount in ETH (e.g., "0.1")
+</ParamField>
+
+<ParamField path="params.data" type="string">
+  Transaction data (hex)
+</ParamField>
+
+<ParamField path="params.gasLimit" type="string">
+  Gas limit (hex)
+</ParamField>
+
+**Returns:** `Promise<{ hash: string }>`
+
+```typescript
+const { sendTransaction } = useComprehensiveWallet();
+
+const result = await sendTransaction({
+  to: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  value: '0.1', // 0.1 ETH
+});
+
+console.log('Transaction hash:', result.hash);
+```
+
+#### sendToken()
+
+Send ERC20 tokens.
+
+<ParamField path="params" type="SendTokenParams" required>
+  Token transfer parameters
+</ParamField>
+
+<ParamField path="params.tokenAddress" type="string" required>
+  Token contract address
+</ParamField>
+
+<ParamField path="params.to" type="string" required>
+  Recipient address
+</ParamField>
+
+<ParamField path="params.amount" type="string" required>
+  Amount to send (in token units)
+</ParamField>
+
+<ParamField path="params.decimals" type="number">
+  Token decimals (defaults to 18)
+</ParamField>
+
+**Returns:** `Promise<{ hash: string }>`
+
+```typescript
+const { sendToken, tokenAddresses } = useComprehensiveWallet();
+
+const result = await sendToken({
+  tokenAddress: tokenAddresses.USDC,
+  to: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  amount: '100',
+  decimals: 6,
+});
+```
+
+#### signMessage()
+
+Sign a message with the wallet.
+
+<ParamField path="message" type="string" required>
+  Message to sign
+</ParamField>
+
+**Returns:** `Promise<string>` - Signature
+
+```typescript
+const { signMessage } = useComprehensiveWallet();
+
+const signature = await signMessage('Hello, Web3!');
+console.log('Signature:', signature);
+```
+
+#### refreshBalances()
+
+Manually refresh all token balances.
+
+```typescript
+const { refreshBalances } = useComprehensiveWallet();
+
+await refreshBalances();
+```
+
+<Note>
+  Balances are automatically refreshed every 10 seconds when wallet is connected.
+</Note>
+
+#### Multi-Wallet Methods
+
+<ResponseField name="switchWallet" type="(walletId: string) => Promise<void>">
+  Switch to a different connected wallet
+</ResponseField>
+
+<ResponseField name="addWallet" type="() => Promise<void>">
+  Open Dynamic's add wallet flow
+</ResponseField>
+
+<ResponseField name="openAuthFlow" type="() => void">
+  Manually open Dynamic authentication modal
+</ResponseField>
+
+### TypeScript Types
+
+```typescript
+interface WalletBalance {
+  eth: string;
+  usdc: string;
+  btc: string;
+  totalUSD: string;
+}
+
+interface TokenBalance {
+  symbol: string;
+  name: string;
+  balance: string;
+  decimals: number;
+  address?: string;
+}
+
+interface TransactionParams {
+  to: string;
+  value?: string;
+  data?: string;
+  gasLimit?: string;
+}
+
+interface SendTokenParams {
+  tokenAddress: string;
+  to: string;
+  amount: string;
+  decimals?: number;
+}
+```
+
+---
+
+## useAgwWallet
+
+Production-ready wallet hook with embedded wallet support and 10+ token balances on Base Sepolia.
+
+### Import
+
+```typescript
+import { useAgwWallet } from '@/hooks/usePrivyWallet';
+```
+
+### Usage
+
+```typescript
+function DepositPage() {
+  const {
+    connected,
+    address,
+    ethBalance,
+    usdcBalance,
+    btcBalance,
+    signIn,
+    signOut,
+    sendTransaction,
+    sendToken,
+    refreshBalance,
+  } = useAgwWallet();
+
+  if (!connected) {
+    return <button onClick={signIn}>Sign In</button>;
+  }
+
+  return (
+    <div>
+      <p>Address: {address}</p>
+      <p>ETH: {ethBalance}</p>
+      <p>USDC: {usdcBalance}</p>
+      <p>BTC: {btcBalance}</p>
+      <button onClick={signOut}>Sign Out</button>
+    </div>
+  );
+}
+```
+
+### Return Values
+
+#### State
+
+<ResponseField name="address" type="string | null">
+  Connected wallet address
+</ResponseField>
+
+<ResponseField name="connected" type="boolean">
+  Whether wallet is connected
+</ResponseField>
+
+<ResponseField name="loading" type="boolean">
+  Whether operation is in progress
+</ResponseField>
+
+<ResponseField name="error" type="null">
+  Error state (always null, errors shown via toast)
+</ResponseField>
+
+<ResponseField name="email" type="string | null">
+  User email from Dynamic profile
+</ResponseField>
+
+#### Token Balances
+
+<ResponseField name="balance" type="string">
+  ETH balance (alias for ethBalance)
+</ResponseField>
+
+<ResponseField name="ethBalance" type="string">
+  ETH balance (18 decimals)
+</ResponseField>
+
+<ResponseField name="usdcBalance" type="string">
+  USDC balance (6 decimals)
+</ResponseField>
+
+<ResponseField name="btcBalance" type="string">
+  BTC balance (8 decimals)
+</ResponseField>
+
+<ResponseField name="solBalance" type="string">
+  SOL balance (9 decimals)
+</ResponseField>
+
+<ResponseField name="bnbBalance" type="string">
+  BNB balance (18 decimals)
+</ResponseField>
+
+<ResponseField name="xrpBalance" type="string">
+  XRP balance (6 decimals)
+</ResponseField>
+
+<ResponseField name="tonBalance" type="string">
+  TON balance (9 decimals)
+</ResponseField>
+
+<ResponseField name="avaxBalance" type="string">
+  AVAX balance (18 decimals)
+</ResponseField>
+
+<ResponseField name="tronBalance" type="string">
+  TRON balance (6 decimals)
+</ResponseField>
+
+<ResponseField name="cardanoBalance" type="string">
+  CARDANO balance (6 decimals)
+</ResponseField>
+
+<ResponseField name="dogeBalance" type="string">
+  DOGE balance (8 decimals)
+</ResponseField>
+
+#### Token Addresses
+
+<ResponseField name="USDC_ADDRESS" type="string">
+  `0xBEE08798a3634e29F47e3d277C9d11507D55F66a`
+</ResponseField>
+
+<ResponseField name="BTC_ADDRESS" type="string">
+  `0x7d9E31f5cCac4b9c8566f343A6bD6f3263DFcC91`
+</ResponseField>
+
+<ResponseField name="SOL_ADDRESS" type="string">
+  `0x241ECE6Dce0E0825F9992410B3fA5d4b8fC8d199`
+</ResponseField>
+
+<ResponseField name="BNB_ADDRESS" type="string">
+  `0xAA9Be1a8A7f7254C1759bAa7e0f7864579c33a96`
+</ResponseField>
+
+<ResponseField name="XRP_ADDRESS" type="string">
+  `0x01E278B5421AAC93A206C15b2933419DA19E17b3`
+</ResponseField>
+
+<ResponseField name="TON_ADDRESS" type="string">
+  `0xC85D84a1092b81aCBA9bC75fad6063a7DA642E36`
+</ResponseField>
+
+<ResponseField name="AVAX_ADDRESS" type="string">
+  `0x5DC449E37b6DAAD182d4Fb13C8dFE53C383C2E46`
+</ResponseField>
+
+<ResponseField name="TRON_ADDRESS" type="string">
+  `0x45442ecB66A1a10c0F9817fb7F2B50a3bB99bd69`
+</ResponseField>
+
+<ResponseField name="CARDANO_ADDRESS" type="string">
+  `0xcB1A4c81E7a56cbE2246DA3aE256Ba0154940648`
+</ResponseField>
+
+<ResponseField name="DOGE_ADDRESS" type="string">
+  `0x803aD69f487536Ec1eE8a83Cd329e3d1703f8337`
+</ResponseField>
+
+### Methods
+
+#### signIn()
+
+Open Dynamic login modal to create embedded wallet.
+
+```typescript
+const { signIn } = useAgwWallet();
+
+await signIn();
+```
+
+#### signOut() / disconnect()
+
+Logout and clear wallet data.
+
+```typescript
+const { signOut } = useAgwWallet();
+
+await signOut();
+```
+
+<Note>
+  `disconnect()` is an alias for `signOut()`.
+</Note>
+
+#### refreshBalance()
+
+Refresh all token balances (ETH + 10 tokens).
+
+```typescript
+const { refreshBalance } = useAgwWallet();
+
+await refreshBalance();
+```
+
+#### getAddress()
+
+Get current wallet address.
+
+**Returns:** `string | null`
+
+```typescript
+const { getAddress } = useAgwWallet();
+
+const address = getAddress();
+```
+
+#### sendTransaction()
+
+Send ETH transaction with optional contract data.
+
+<ParamField path="to" type="string" required>
+  Recipient address
+</ParamField>
+
+<ParamField path="value" type="string" required>
+  Amount in ETH
+</ParamField>
+
+<ParamField path="tokenType" type="'ETH' | 'USDC'">
+  Token type (defaults to 'ETH')
+</ParamField>
+
+<ParamField path="data" type="string">
+  Contract call data (hex)
+</ParamField>
+
+<ParamField path="skipSave" type="boolean">
+  Skip saving transaction to localStorage
+</ParamField>
+
+**Returns:** `Promise<{ hash: string, receipt: TransactionReceipt }>`
+
+```typescript
+const { sendTransaction } = useAgwWallet();
+
+const result = await sendTransaction(
+  '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  '0.05', // 0.05 ETH
+  'ETH'
+);
+
+console.log('TX Hash:', result.hash);
+console.log('Receipt:', result.receipt);
+```
+
+#### sendToken()
+
+Send ERC20 tokens with automatic transaction encoding.
+
+<ParamField path="tokenAddress" type="string" required>
+  Token contract address
+</ParamField>
+
+<ParamField path="to" type="string" required>
+  Recipient address
+</ParamField>
+
+<ParamField path="amount" type="string" required>
+  Amount to send
+</ParamField>
+
+<ParamField path="decimals" type="number">
+  Token decimals (defaults to 6)
+</ParamField>
+
+**Returns:** `Promise<{ hash: string, receipt: TransactionReceipt }>`
+
+```typescript
+const { sendToken, USDC_ADDRESS } = useAgwWallet();
+
+const result = await sendToken(
+  USDC_ADDRESS,
+  '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  '100', // 100 USDC
+  6
+);
+```
+
+#### addPasskey()
+
+Open Dynamic user profile to add passkey MFA.
+
+```typescript
+const { addPasskey } = useAgwWallet();
+
+await addPasskey();
+```
+
+<Warning>
+  Requires wallet to be connected. Shows warning toast if not connected.
+</Warning>
+
+#### exportPrivateKey()
+
+Open Dynamic settings to export private key.
+
+```typescript
+const { exportPrivateKey } = useAgwWallet();
+
+await exportPrivateKey();
+```
+
+<Warning>
+  Requires MFA/Passkey setup in Dynamic dashboard. Users must add passkey before exporting.
+</Warning>
+
+### Supported Tokens
+
+```typescript
+export const SUPPORTED_TOKENS = {
+  BTC: { address: '0x7d9E31f5cCac4b9c8566f343A6bD6f3263DFcC91', decimals: 8, symbol: 'BTC', name: 'Bitcoin' },
+  SOL: { address: '0x241ECE6Dce0E0825F9992410B3fA5d4b8fC8d199', decimals: 9, symbol: 'SOL', name: 'Solana' },
+  BNB: { address: '0xAA9Be1a8A7f7254C1759bAa7e0f7864579c33a96', decimals: 18, symbol: 'BNB', name: 'BNB' },
+  XRP: { address: '0x01E278B5421AAC93A206C15b2933419DA19E17b3', decimals: 6, symbol: 'XRP', name: 'Ripple' },
+  TON: { address: '0xC85D84a1092b81aCBA9bC75fad6063a7DA642E36', decimals: 9, symbol: 'TON', name: 'Toncoin' },
+  AVAX: { address: '0x5DC449E37b6DAAD182d4Fb13C8dFE53C383C2E46', decimals: 18, symbol: 'AVAX', name: 'Avalanche' },
+  TRON: { address: '0x45442ecB66A1a10c0F9817fb7F2B50a3bB99bd69', decimals: 6, symbol: 'TRON', name: 'Tron' },
+  CARDANO: { address: '0xcB1A4c81E7a56cbE2246DA3aE256Ba0154940648', decimals: 6, symbol: 'CARDANO', name: 'Cardano' },
+  DOGE: { address: '0x803aD69f487536Ec1eE8a83Cd329e3d1703f8337', decimals: 8, symbol: 'DOGE', name: 'Dogecoin' },
+  USDC: { address: '0xBEE08798a3634e29F47e3d277C9d11507D55F66a', decimals: 6, symbol: 'USDC', name: 'USD Coin' },
+};
+```
+
+### Performance Optimizations
+
+<AccordionGroup>
+  <Accordion title="Wallet Client Caching">
+    The hook caches the wallet client to avoid repeated async calls:
+    
+    ```typescript
+    // Wallet client is preloaded when wallet connects
+    useEffect(() => {
+      if (primaryWallet) {
+        primaryWallet.getWalletClient?.().then((client) => {
+          walletClientRef.current = client;
+        });
+      }
+    }, [primaryWallet]);
+    ```
+  </Accordion>
+
+  <Accordion title="Parallel Balance Fetching">
+    All token balances are fetched in parallel with Promise.allSettled:
+    
+    ```typescript
+    const [ethBal, usdcData, btcData, ...] = await Promise.allSettled([
+      fetchEthBalance(),
+      fetchTokenBalance(USDC_ADDRESS),
+      fetchTokenBalance(BTC_ADDRESS),
+      // ... all other tokens
+    ]);
+    ```
+  </Accordion>
+
+  <Accordion title="Request Timeout Protection">
+    10-second timeout prevents hanging requests:
+    
+    ```typescript
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## useDynamicWallet
+
+Lightweight wallet hook for basic wallet operations.
+
+### Import
+
+```typescript
+import { useDynamicWallet } from '@/hooks/usePrivyWallet';
+```
+
+### Usage
+
+```typescript
+function SimpleWallet() {
+  const {
+    isConnected,
+    address,
+    connect,
+    disconnect,
+    getBalance,
+    send,
+  } = useDynamicWallet();
+
+  return (
+    <div>
+      {isConnected ? (
+        <>
+          <p>{address}</p>
+          <button onClick={disconnect}>Disconnect</button>
+        </>
+      ) : (
+        <button onClick={connect}>Connect</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Return Values
+
+<ResponseField name="isReady" type="boolean">
+  Always `true` (hook is ready)
+</ResponseField>
+
+<ResponseField name="isConnected" type="boolean">
+  Whether wallet is connected
+</ResponseField>
+
+<ResponseField name="address" type="string | undefined">
+  Connected wallet address
+</ResponseField>
+
+<ResponseField name="user" type="User | null">
+  User profile from Dynamic
+</ResponseField>
+
+<ResponseField name="chainId" type="number">
+  Base Sepolia chain ID (84532)
+</ResponseField>
+
+<ResponseField name="chainName" type="string">
+  "Base Sepolia"
+</ResponseField>
+
+<ResponseField name="primaryWallet" type="Wallet | null">
+  Primary wallet object
+</ResponseField>
+
+### Methods
+
+#### connect()
+
+```typescript
+const { connect } = useDynamicWallet();
+await connect();
+```
+
+#### disconnect()
+
+Disconnects with 2-second timeout for faster UX.
+
+```typescript
+const { disconnect } = useDynamicWallet();
+await disconnect();
+```
+
+#### getBalance()
+
+Fetch ETH balance.
+
+**Returns:** `Promise<string>`
+
+```typescript
+const { getBalance } = useDynamicWallet();
+
+const balance = await getBalance();
+console.log('Balance:', balance, 'ETH');
+```
+
+#### send()
+
+Send ETH transaction.
+
+<ParamField path="to" type="string" required>
+  Recipient address
+</ParamField>
+
+<ParamField path="amount" type="string" required>
+  Amount in ETH
+</ParamField>
+
+**Returns:** `Promise<{ hash: string }>`
+
+```typescript
+const { send } = useDynamicWallet();
+
+const result = await send(
+  '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  '0.01'
+);
+```
+
+---
+
+## Hook Comparison
+
+<Tabs>
+  <Tab title="useComprehensiveWallet">
+    **Best for:** Full-featured applications requiring multi-wallet support
+
+    **Features:**
+    - Multi-wallet management
+    - Auto-refreshing balances (10s interval)
+    - Token balance tracking (ETH, USDC, BTC)
+    - Message signing
+    - Network switching
+    - Comprehensive error handling
+
+    **Use cases:**
+    - DeFi dashboards
+    - Portfolio trackers
+    - Multi-chain applications
+  </Tab>
+
+  <Tab title="useAgwWallet">
+    **Best for:** Production apps with 10+ token support
+
+    **Features:**
+    - 10+ token balances (BTC, ETH, SOL, BNB, etc.)
+    - Wallet client caching
+    - Parallel balance fetching
+    - Transaction history
+    - Passkey MFA support
+    - Private key export
+
+    **Use cases:**
+    - Token trading platforms
+    - Multi-token wallets
+    - Deposit/withdrawal systems
+  </Tab>
+
+  <Tab title="useDynamicWallet">
+    **Best for:** Simple applications with basic wallet needs
+
+    **Features:**
+    - Lightweight (~100 LOC)
+    - Basic ETH operations
+    - Fast disconnect (2s timeout)
+    - Minimal dependencies
+
+    **Use cases:**
+    - Simple dApps
+    - Authentication-only apps
+    - Prototype applications
+  </Tab>
+</Tabs>
+
+---
+
+## Common Patterns
+
+### Send USDC Transaction
+
+```typescript
+const { sendToken, tokenAddresses } = useComprehensiveWallet();
+
+const result = await sendToken({
+  tokenAddress: tokenAddresses.USDC,
+  to: recipientAddress,
+  amount: '100',
+  decimals: 6,
+});
+```
+
+### Check Multiple Balances
+
+```typescript
+const { getAllTokenBalances } = useComprehensiveWallet();
+
+const balances = getAllTokenBalances();
+balances.forEach(token => {
+  console.log(`${token.symbol}: ${token.balance}`);
+});
+```
+
+### Handle Transaction Errors
+
+```typescript
+const { sendTransaction } = useAgwWallet();
+
+try {
+  const result = await sendTransaction(to, amount, 'ETH');
+  console.log('Success:', result.hash);
+} catch (error) {
+  // Error automatically shown via toast
+  console.error('Transaction failed:', error);
+}
+```
+
+### Multi-Wallet Support
+
+```typescript
+const { userWallets, switchWallet, addWallet } = useComprehensiveWallet();
+
+// List all wallets
+userWallets.forEach(wallet => {
+  console.log(wallet.address);
+});
+
+// Switch to different wallet
+await switchWallet(walletId);
+
+// Add new wallet
+await addWallet();
+```
+
+---
+
+## TypeScript Support
+
+All hooks are fully typed with TypeScript:
+
+```typescript
+import type { ComprehensiveWallet } from '@/hooks/useComprehensiveWallet';
+import type { TokenBalance, WalletBalance } from '@/hooks/useComprehensiveWallet';
+
+const wallet: ComprehensiveWallet = useComprehensiveWallet();
+```
+
+---
+
+## File Locations
+
+<CodeGroup>
+```typescript hooks/useComprehensiveWallet.ts
+// Source: Frontend/Landingpage/src/hooks/useComprehensiveWallet.ts
+```
+
+```typescript hooks/usePrivyWallet.ts
+// useAgwWallet and useDynamicWallet
+// Source: Frontend/Landingpage/src/hooks/usePrivyWallet.ts
+```
+
+```typescript pages/deposit/hooks/useAgwWallet.ts
+// Deposit-specific useAgwWallet implementation
+// Source: Frontend/Landingpage/src/pages/deposit/hooks/useAgwWallet.ts
+```
+</CodeGroup>

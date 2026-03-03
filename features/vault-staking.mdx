@@ -1,0 +1,778 @@
+---
+title: 'Vault Staking'
+description: 'Lock assets and earn guaranteed APY with flexible durations'
+icon: 'lock'
+---
+
+## Overview
+
+GweAI's Vault allows you to lock cryptocurrency assets for fixed periods and earn guaranteed yields. The longer you lock, the higher the APY. All stakes are secured on-chain via the VaultStaking smart contract.
+
+<CardGroup cols={2}>
+  <Card title="Guaranteed APY" icon="percentage">
+    Fixed returns based on lock duration
+  </Card>
+  <Card title="Flexible Durations" icon="calendar">
+    Lock for 30, 60, 90, 180, or 365 days
+  </Card>
+  <Card title="Early Unlock Option" icon="unlock">
+    Withdraw early with proportional penalty
+  </Card>
+  <Card title="Real-Time Yield" icon="clock">
+    Watch your earnings grow every second
+  </Card>
+</CardGroup>
+
+## Accessing the Vault
+
+<Steps>
+  <Step title="Navigate to Vault">
+    Click **Vault** in the main navigation menu
+  </Step>
+  <Step title="Connect Wallet">
+    Ensure your wallet is connected to Base Sepolia
+  </Step>
+  <Step title="Choose a Stake Pool">
+    Select from BTC, SOL, or USDC pools
+  </Step>
+  <Step title="Lock Your Assets">
+    Enter amount and duration, then confirm
+  </Step>
+</Steps>
+
+## Stake Pools
+
+### Available Pools
+
+Three primary staking pools:
+
+<AccordionGroup>
+  <Accordion title="Bitcoin (BTC) Pool" icon="bitcoin">
+    **Base APY:** 10.0%
+    
+    **Lock Durations:**
+    - 30 days: 7.0% APY (0.7× multiplier)
+    - 60 days: 8.5% APY (0.85× multiplier)
+    - 90 days: 10.0% APY (1.0× multiplier)
+    - 180 days: 11.5% APY (1.15× multiplier)
+    - 365 days: 13.0% APY (1.3× multiplier)
+    
+    **Best For:** Long-term holders seeking stable returns
+  </Accordion>
+
+  <Accordion title="Solana (SOL) Pool" icon="s">
+    **Base APY:** 9.0%
+    
+    **Lock Durations:**
+    - 30 days: 6.3% APY
+    - 60 days: 7.65% APY
+    - 90 days: 9.0% APY
+    - 180 days: 10.35% APY
+    - 365 days: 11.7% APY
+    
+    **Best For:** Growth-focused investors
+  </Accordion>
+
+  <Accordion title="USDC Pool" icon="dollar-sign">
+    **Base APY:** 6.0%
+    
+    **Lock Durations:**
+    - 30 days: 4.2% APY
+    - 60 days: 5.1% APY
+    - 90 days: 6.0% APY
+    - 180 days: 6.9% APY
+    - 365 days: 7.8% APY
+    
+    **Best For:** Risk-averse, stable returns
+  </Accordion>
+</AccordionGroup>
+
+### Pool Statistics
+
+Each pool displays:
+
+- **Total Staked:** Combined amount from all users
+- **Total Staked USD:** Dollar value at current prices
+- **Participants:** Number of active stakers
+- **APY Range:** Min to max based on duration
+
+## Staking Process
+
+<Steps>
+  <Step title="Select Pool">
+    Click **Stake** on your chosen pool (BTC, SOL, or USDC)
+  </Step>
+  <Step title="Enter Amount">
+    Type the amount of tokens to lock
+    
+    **Balance Check:** Shows your available balance
+    
+    Example: `5000` (for 5,000 USDC)
+  </Step>
+  <Step title="Choose Duration">
+    Select lock period from dropdown:
+    
+    ```
+    30 days  → 4.2% APY
+    60 days  → 5.1% APY
+    90 days  → 6.0% APY
+    180 days → 6.9% APY
+    365 days → 7.8% APY
+    ```
+  </Step>
+  <Step title="Review Projection">
+    Modal shows estimated earnings:
+    
+    ```
+    Amount: 5,000 USDC
+    Duration: 180 days
+    APY: 6.9%
+    
+    Estimated Yield: 169.32 USDC
+    Total at Unlock: 5,169.32 USDC
+    Unlock Date: June 15, 2026
+    ```
+  </Step>
+  <Step title="Approve & Stake">
+    Click **Stake Now**
+    
+    **Transaction 1:** Approve USDC spending
+    
+    **Transaction 2:** Execute stake
+    
+    Both require wallet confirmation
+  </Step>
+  <Step title="Confirmation">
+    Stake appears in "Locked Assets" tab
+    
+    Yield starts accruing immediately
+  </Step>
+</Steps>
+
+## Smart Contract Integration
+
+### VaultStaking Contract
+
+All stakes are managed on-chain:
+
+```typescript
+// VaultStaking contract address
+const VAULT_STAKING_ADDRESS = '0xB156a66521BCB5A903daA42879A3e562E402Fa41';
+
+// Staking function
+function stakeToken(
+  address token,      // Token contract address
+  uint256 amount,     // Amount to stake (in wei)
+  uint256 lockDuration // Duration in days (30/60/90/180/365)
+) external {
+  // Transfer tokens from user to contract
+  IERC20(token).transferFrom(msg.sender, address(this), amount);
+  
+  // Calculate APY based on duration
+  uint256 apy = getAPYForDuration(token, lockDuration);
+  
+  // Calculate total yield
+  uint256 totalYield = (amount * apy * lockDuration) / (365 * 10000);
+  
+  // Store stake details
+  stakes[stakeId] = Stake({
+    user: msg.sender,
+    token: token,
+    amount: amount,
+    lockDate: block.timestamp,
+    unlockDate: block.timestamp + (lockDuration * 1 days),
+    apy: apy,
+    totalYield: totalYield,
+    withdrawn: false
+  });
+}
+```
+
+### Stake Approval Flow
+
+<AccordionGroup>
+  <Accordion title="Step 1: Token Approval" icon="check-circle">
+    **First Transaction:**
+    
+    ```typescript
+    // Approve VaultStaking contract to spend tokens
+    const approveData = `0x095ea7b3${  // approve()
+      VAULT_STAKING_ADDRESS.slice(2).padStart(64, '0')  // spender
+    }${
+      amountInWei.toString(16).padStart(64, '0')  // amount
+    }`;
+    
+    await sendTransaction(tokenAddress, '0', 'ETH', approveData);
+    ```
+    
+    **Why?** ERC-20 tokens require permission before contracts can transfer them.
+  </Accordion>
+
+  <Accordion title="Step 2: Stake Execution" icon="lock">
+    **Second Transaction:**
+    
+    ```typescript
+    // Call stakeToken(address token, uint256 amount, uint256 duration)
+    const stakeData = `0x2a69b56f${  // stakeToken()
+      tokenAddress.slice(2).padStart(64, '0')    // token
+    }${
+      amountInWei.toString(16).padStart(64, '0') // amount
+    }${
+      duration.toString(16).padStart(64, '0')    // duration
+    }`;
+    
+    await sendTransaction(
+      VAULT_STAKING_ADDRESS, 
+      '0', 
+      'ETH', 
+      stakeData
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="Step 3: On-Chain Recording" icon="database">
+    **Contract Creates Stake:**
+    
+    ```solidity
+    emit Staked(
+      msg.sender,      // User address
+      stakeId,         // Unique stake ID
+      token,           // Token address
+      amount,          // Staked amount
+      lockDuration,    // Duration in days
+      block.timestamp  // Stake timestamp
+    );
+    ```
+    
+    This event is used to rebuild your stakes from blockchain.
+  </Accordion>
+</AccordionGroup>
+
+## Viewing Your Stakes
+
+### Locked Assets Tab
+
+Shows all active stakes:
+
+<Frame>
+  <img src="/images/vault-locked-assets.png" alt="Locked assets view" />
+</Frame>
+
+**Each stake displays:**
+- **Token & Amount:** Logo, symbol, quantity
+- **USD Value:** Current market value
+- **Lock Duration:** Total days (e.g., "90 days")
+- **APY:** Effective annual percentage yield
+- **Unlock Date:** When you can withdraw
+- **Countdown Timer:** Days/hours/minutes remaining
+- **Current Yield:** Real-time accrued earnings
+- **Total Yield:** Final amount at unlock
+- **Progress Bar:** Visual completion percentage
+
+### Real-Time Yield Calculation
+
+Yields update every second:
+
+```typescript
+// From VaultPage.tsx
+const currentYield = useMemo(() => {
+  const now = Date.now();
+  const elapsed = now - asset.lockDate;
+  const total = asset.unlockDate - asset.lockDate;
+  
+  // Calculate proportional yield
+  const yieldProgress = elapsed / total;
+  return asset.totalYield * yieldProgress;
+}, [currentTime, asset]);  // Recalculates every second
+```
+
+**Example:**
+```
+Stake: 5,000 USDC for 180 days at 6.9% APY
+Total Yield: 169.32 USDC
+
+After 90 days (50% complete):
+Current Yield: 84.66 USDC
+Value: 5,084.66 USDC
+```
+
+## Unlocking Assets
+
+### Normal Unlock (After Lock Period)
+
+<Steps>
+  <Step title="Wait for Unlock Date">
+    Monitor countdown timer on your stake card
+    
+    When timer reaches 0, status changes to "Unlocked"
+  </Step>
+  <Step title="Navigate to Unlocked Tab">
+    Click **Unlocked Assets** tab
+    
+    Your matured stake appears here
+  </Step>
+  <Step title="Claim Assets">
+    Click **Unlock** button on the stake card
+    
+    Confirm transaction in wallet
+  </Step>
+  <Step title="Receive Tokens + Yield">
+    Both principal and yield are transferred:
+    
+    ```
+    Original: 5,000 USDC
+    Yield: 169.32 USDC
+    Total Received: 5,169.32 USDC
+    ```
+  </Step>
+</Steps>
+
+### Contract Withdrawal
+
+```typescript
+// From VaultPage.tsx - Normal unlock
+const handleUnlock = async (assetId: string) => {
+  // Call withdraw(uint256 stakeId)
+  const withdrawData = `0x2e1a7d4d${  // withdraw()
+    stakeId.toString(16).padStart(64, '0')  // Stake ID
+  }`;
+  
+  const result = await sendTransaction(
+    VAULT_STAKING_ADDRESS,
+    '0',
+    'ETH',
+    withdrawData
+  );
+  
+  // Contract transfers: principal + totalYield
+};
+```
+
+## Early Unlock
+
+### When to Use Early Unlock
+
+Sometimes you need access to locked funds before maturity:
+
+- **Emergency expenses**
+- **Better investment opportunities**
+- **Market conditions change**
+
+<Warning>
+**Penalty Applied:** Early unlock incurs a penalty proportional to remaining lock time.
+</Warning>
+
+### Penalty Calculation
+
+```typescript
+// From vaultService.ts
+export function calculateEarlyWithdrawalPenalty(
+  amount: number,
+  lockDate: number,
+  unlockDate: number,
+  totalYield: number,
+  currentTime: number
+) {
+  const elapsed = currentTime - lockDate;
+  const totalDuration = unlockDate - lockDate;
+  const remaining = unlockDate - currentTime;
+  
+  // Penalty = (remaining time / total time) × total yield
+  const penaltyPercentage = (remaining / totalDuration) * 100;
+  const penalty = (remaining / totalDuration) * totalYield;
+  const amountAfterPenalty = amount + totalYield - penalty;
+  
+  return {
+    penalty,
+    penaltyPercentage,
+    amountAfterPenalty
+  };
+}
+```
+
+**Example:**
+```
+Stake: 5,000 USDC, 180 days, 6.9% APY
+Total Yield: 169.32 USDC
+
+After 90 days (50% remaining):
+  Penalty: 50% × 169.32 = 84.66 USDC
+  Amount After Penalty: 5,000 + 169.32 - 84.66 = 5,084.66 USDC
+
+After 135 days (25% remaining):
+  Penalty: 25% × 169.32 = 42.33 USDC
+  Amount After Penalty: 5,000 + 169.32 - 42.33 = 5,126.99 USDC
+```
+
+### Early Unlock Process
+
+<Steps>
+  <Step title="Click Early Unlock">
+    On a locked stake, click **Early Unlock** button
+  </Step>
+  <Step title="Review Penalty">
+    Modal shows:
+    ```
+    Original Amount: 5,000 USDC
+    Current Yield: 84.66 USDC
+    Penalty (50%): -84.66 USDC
+    
+    You'll Receive: 5,000 USDC
+    (No gain, no loss on principal)
+    ```
+  </Step>
+  <Step title="Confirm Early Unlock">
+    If acceptable, click **Confirm Early Unlock**
+    
+    Approve transaction in wallet
+  </Step>
+  <Step title="Receive Penalized Amount">
+    Contract transfers: principal + (yield - penalty)
+  </Step>
+</Steps>
+
+### Contract Early Withdrawal
+
+```typescript
+// Call withdrawEarly(uint256 stakeId)
+const earlyUnlockData = `0x4f4b48f2${  // withdrawEarly()
+  stakeId.toString(16).padStart(64, '0')
+}`;
+
+const result = await sendTransaction(
+  VAULT_STAKING_ADDRESS,
+  '0',
+  'ETH',
+  earlyUnlockData
+);
+
+// Contract calculates penalty on-chain and transfers:
+// principal + (totalYield × elapsed / total)
+```
+
+<Info>
+**Penalty is Yield Only:** The penalty NEVER affects your principal. You always get back at least what you staked.
+</Info>
+
+## Transaction History
+
+### History Tab
+
+Tracks all vault activity:
+
+<Frame>
+  <img src="/images/vault-history.png" alt="Vault transaction history" />
+</Frame>
+
+**Record Types:**
+- **STAKED:** New stake created
+- **UNSTAKED:** Normal unlock (full yield)
+- **EARLY UNLOCK:** Early withdrawal (with penalty)
+
+**Each entry shows:**
+- **Type Badge:** Colored by action type
+- **Token & Amount:** What was staked/unlocked
+- **Timestamp:** When action occurred
+- **APY:** Rate earned (for stakes)
+- **Penalty:** Percentage lost (for early unlocks)
+- **Status:** Completed/Failed
+- **Transaction Hash:** Link to blockchain explorer
+
+### Persistent Storage
+
+History is saved in localStorage per wallet:
+
+```typescript
+// From VaultPage.tsx
+const historyKey = `vaultHistory_${address.toLowerCase()}`;
+localStorage.setItem(historyKey, JSON.stringify(history));
+```
+
+## Stake Synchronization
+
+### Fetching from Blockchain
+
+Your stakes are always fetched from the smart contract:
+
+```typescript
+// From vaultService.ts
+export async function getUserStakeIds(userAddress: string): Promise<number[]> {
+  const logs = await publicClient.getLogs({
+    address: VAULT_STAKING_ADDRESS,
+    event: StakedEvent,
+    args: {
+      user: userAddress  // Filter to your address
+    },
+    fromBlock: 'earliest'
+  });
+  
+  return logs.map(log => Number(log.args.stakeId));
+}
+
+export async function getStakeDetails(stakeId: number): Promise<Stake> {
+  const stake = await publicClient.readContract({
+    address: VAULT_STAKING_ADDRESS,
+    abi: vaultAbi,
+    functionName: 'stakes',
+    args: [BigInt(stakeId)]
+  });
+  
+  return {
+    user: stake.user,
+    token: stake.token,
+    amount: stake.amount,
+    lockDate: Number(stake.lockDate),
+    unlockDate: Number(stake.unlockDate),
+    apy: Number(stake.apy),
+    totalYield: stake.totalYield,
+    withdrawn: stake.withdrawn
+  };
+}
+```
+
+### Refresh from Contract
+
+Click the **"Refresh from Contract"** button to sync:
+
+<Steps>
+  <Step title="Fetch Stake IDs">
+    Queries blockchain for all your stake events
+  </Step>
+  <Step title="Load Stake Details">
+    For each ID, fetches current on-chain state
+  </Step>
+  <Step title="Filter Active Stakes">
+    Skips stakes marked as `withdrawn: true`
+  </Step>
+  <Step title="Update UI">
+    Replaces local state with fresh blockchain data
+  </Step>
+</Steps>
+
+<Note>
+**Source of Truth:** The blockchain is always the authoritative source. LocalStorage is just a cache for faster initial load.
+</Note>
+
+## Vault Dashboard Stats
+
+### Real-Time Statistics
+
+Top of the Vault page shows aggregated metrics:
+
+<CardGroup cols={2}>
+  <Card title="Total Locked" icon="lock">
+    Combined USD value of all your stakes
+  </Card>
+  <Card title="Total Yield" icon="chart-line">
+    Sum of current accrued earnings across all stakes
+  </Card>
+  <Card title="Active Vaults" icon="folder-open">
+    Number of locked + unlocking stakes
+  </Card>
+  <Card title="Average APY" icon="percentage">
+    Weighted average APY across all vaults
+  </Card>
+</CardGroup>
+
+### Calculation Details
+
+```typescript
+// From VaultPage.tsx
+const stats: VaultStats = useMemo(() => {
+  return {
+    totalLocked: lockedAssets.reduce(
+      (sum, asset) => sum + asset.usdValue, 
+      0
+    ),
+    totalYieldEarned: lockedAssets.reduce((sum, asset) => {
+      const elapsed = currentTime - asset.lockDate;
+      const total = asset.unlockDate - asset.lockDate;
+      const currentYield = (elapsed / total) * asset.totalYield;
+      const yieldValue = currentYield * (asset.usdValue / asset.amount);
+      return sum + yieldValue;
+    }, 0),
+    activeVaults: lockedAssets.filter(
+      a => a.status === 'locked' || a.status === 'unlocking'
+    ).length,
+    averageAPY: lockedAssets.reduce(
+      (sum, asset) => sum + asset.apy, 0
+    ) / (lockedAssets.length || 1)
+  };
+}, [lockedAssets, currentTime]);
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose Duration Wisely" icon="calendar-check">
+    **Longer = Higher APY**
+    
+    But only lock funds you won't need:
+    - 30 days: Short-term savings
+    - 90 days: Medium-term goals
+    - 180-365 days: Long-term wealth building
+    
+    **Avoid:** Locking emergency funds
+  </Accordion>
+
+  <Accordion title="Diversify Lock Periods" icon="layer-group">
+    **Staggered Unlocks:**
+    
+    Don't lock everything for 365 days. Instead:
+    - 25% for 30 days
+    - 25% for 90 days
+    - 25% for 180 days
+    - 25% for 365 days
+    
+    **Benefit:** Regular liquidity as stakes mature
+  </Accordion>
+
+  <Accordion title="Monitor Yield Regularly" icon="eye">
+    Check your vault weekly:
+    - Verify yield is accruing
+    - Plan for upcoming unlocks
+    - Decide whether to restake
+    
+    **Tip:** Set calendar reminders for unlock dates
+  </Accordion>
+
+  <Accordion title="Understand Early Unlock Costs" icon="calculator">
+    **Only use early unlock if:**
+    - Emergency expense arises
+    - Better opportunity appears (rare)
+    - You've passed 75%+ of lock period (low penalty)
+    
+    **Avoid:** Early unlocking within first 50% of duration
+  </Accordion>
+
+  <Accordion title="Reinvest Unlocked Funds" icon="recycle">
+    **Compounding Strategy:**
+    
+    When stakes unlock:
+    1. Withdraw principal + yield
+    2. Immediately restake the full amount
+    3. Choose same or longer duration
+    
+    **Result:** Exponential growth over time
+  </Accordion>
+</AccordionGroup>
+
+## Security & Safety
+
+<CardGroup cols={2}>
+  <Card title="Smart Contract Audited" icon="shield-check">
+    VaultStaking contract verified on BaseScan
+  </Card>
+  <Card title="Non-Custodial" icon="key">
+    You control your private keys at all times
+  </Card>
+  <Card title="On-Chain Guarantees" icon="link">
+    Yields are locked in smart contract code
+  </Card>
+  <Card title="No Rug Pull Risk" icon="ban">
+    Contract cannot withdraw your funds
+  </Card>
+</CardGroup>
+
+### Contract Address
+
+```
+VaultStaking: 0xB156a66521BCB5A903daA42879A3e562E402Fa41
+```
+
+**Verify on BaseScan:**
+https://sepolia.basescan.org/address/0xB156a66521BCB5A903daA42879A3e562E402Fa41
+
+## Troubleshooting
+
+### "Invalid Stake ID" Error
+
+**Cause:** Stake not found on blockchain
+
+**Solution:**
+1. Click **Refresh from Contract**
+2. Check transaction history to verify stake was created
+3. View stake on blockchain explorer
+
+### Yield Not Increasing
+
+**Cause:** UI not updating (display issue only)
+
+**Solution:**
+1. Refresh the page
+2. Click **Refresh from Contract**
+3. Yield calculation happens every second client-side
+
+### Early Unlock Not Working
+
+**Cause:** Multiple possibilities
+
+**Solutions:**
+- **Still Locked:** Use early unlock, not normal unlock
+- **Already Unlocked:** Use normal unlock instead
+- **Network Issue:** Check Base Sepolia status
+
+### "Insufficient Balance" When Staking
+
+**Cause:** Not enough tokens in wallet
+
+**Solution:**
+1. Check balance in Portfolio
+2. Buy or deposit more tokens
+3. Reduce stake amount
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="Can I add to an existing stake?" icon="circle-question">
+    **No.** Each stake is independent. To add more:
+    1. Create a new stake with additional funds
+    2. Both stakes will run separately
+  </Accordion>
+
+  <Accordion title="What happens if I lose my wallet?" icon="circle-question">
+    **Your funds are safe** if you have your seed phrase.
+    
+    Stakes are tied to your address, not the wallet app. Simply:
+    1. Restore wallet using seed phrase
+    2. Reconnect to GweAI
+    3. Your stakes reappear (fetched from blockchain)
+  </Accordion>
+
+  <Accordion title="Are yields taxable?" icon="circle-question">
+    **Likely yes** in most jurisdictions.
+    
+    Consult a tax professional. Generally:
+    - Staking rewards = taxable income
+    - Taxed at time of receipt (unlock)
+    - Keep records of transaction hashes
+  </Accordion>
+
+  <Accordion title="Can the APY change after I stake?" icon="circle-question">
+    **No.** Your APY is locked in at stake time.
+    
+    The contract guarantees:
+    - APY rate at stake creation
+    - Total yield amount
+    - Unlock date
+    
+    These cannot change, even if pool APY is adjusted for new stakes.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Portfolio" icon="wallet" href="/features/portfolio">
+    Monitor your staked assets' value
+  </Card>
+  <Card title="Trading" icon="chart-candlestick" href="/features/trading">
+    Buy more tokens to stake
+  </Card>
+  <Card title="Swap" icon="arrows-rotate" href="/features/swap">
+    Convert tokens before staking
+  </Card>
+  <Card title="AI Chat" icon="robot" href="/features/ai-chat">
+    Ask about staking strategies
+  </Card>
+</CardGroup>

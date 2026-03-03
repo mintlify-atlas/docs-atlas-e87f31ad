@@ -1,0 +1,323 @@
+---
+title: 'AI Chat Assistant'
+description: 'Intelligent crypto trading assistant powered by AI'
+icon: 'robot'
+---
+
+## Overview
+
+GweAI's AI Chat Assistant is your intelligent trading companion that understands natural language commands to execute trades, create DCA plans, and provide market insights. Powered by OpenRouter API using the Grok-4.1-fast model.
+
+<CardGroup cols={2}>
+  <Card title="Natural Language Trading" icon="comments">
+    Execute swaps, buys, and sells using plain English commands
+  </Card>
+  <Card title="Portfolio Queries" icon="wallet">
+    Check balances and portfolio value instantly
+  </Card>
+  <Card title="DCA Planning" icon="calendar-days">
+    Create systematic investment plans through conversation
+  </Card>
+  <Card title="Multi-Language Support" icon="language">
+    Supports English and Hinglish commands
+  </Card>
+</CardGroup>
+
+## Accessing AI Chat
+
+<Steps>
+  <Step title="Navigate to DCA Page">
+    Click on the **DCA/Chat** menu item in the navigation bar
+  </Step>
+  <Step title="Connect Your Wallet">
+    Click "Connect Wallet" to enable trading features
+  </Step>
+  <Step title="Start Chatting">
+    Type your command in the chat input or click a suggested prompt
+  </Step>
+</Steps>
+
+## Key Features
+
+### Smart Command Parsing
+
+The AI chat uses advanced parsing to understand your intent:
+
+```typescript
+// Example from groqService.ts
+export async function parseTradeRequest(
+  message: string, 
+  lastToken?: string
+): Promise<TradeRequest> {
+  // AI-powered parsing with 614,097 training examples
+  // Supports buy, sell, swap, vault operations
+}
+```
+
+### Supported Commands
+
+<AccordionGroup>
+  <Accordion title="Buy Commands" icon="shopping-cart">
+    - `buy $100 of BTC`
+    - `purchase 0.5 ETH`
+    - `kharido 75$ sol` (Hinglish)
+    - `get me 0.5 BNB`
+  </Accordion>
+
+  <Accordion title="Sell Commands" icon="money-bill-transfer">
+    - `sell 0.5 BTC`
+    - `sell all ETH`
+    - `becho saara SOL` (Hinglish)
+    - `cash out everything DOGE`
+  </Accordion>
+
+  <Accordion title="Swap Commands" icon="arrow-right-arrow-left">
+    - `swap 100$ of BTC to SOL`
+    - `swap 0.5 ETH to ADA`
+    - `exchange 200$ SOL for TRX`
+    - `sell 100$ BTC in ADA`
+  </Accordion>
+
+  <Accordion title="Portfolio Queries" icon="chart-line">
+    - `show my portfolio`
+    - `how much BTC do I have`
+    - `what's my total balance`
+    - `show ETH balance`
+  </Accordion>
+
+  <Accordion title="DCA/SIP Plans" icon="calendar-plus">
+    - `SIP $100 in BTC every Monday`
+    - `Create DCA plan for ETH with $50 weekly`
+    - `Set up monthly SIP for $200 in SOL`
+  </Accordion>
+</AccordionGroup>
+
+### Context-Aware Trading
+
+The AI remembers your conversation context:
+
+```typescript
+// Tracks last mentioned token for follow-up commands
+const [lastMentionedToken, setLastMentionedToken] = useState<string | null>(null);
+
+// Example:
+// User: "How much BTC do I have?"
+// AI shows BTC balance and sets lastMentionedToken = 'BTC'
+// User: "Sell these"
+// AI understands: Sell all BTC
+```
+
+## Trade Execution Flow
+
+<Steps>
+  <Step title="User Sends Command">
+    Type a trading command like "buy $100 BTC"
+  </Step>
+  <Step title="AI Parses Intent">
+    The AI analyzes your command and extracts:
+    - Trade type (buy/sell/swap)
+    - Amount ($100 or token amount)
+    - Token symbols
+    - Slippage preferences
+  </Step>
+  <Step title="Confirmation Card Appears">
+    Review the parsed trade details before execution
+  </Step>
+  <Step title="Execute Trade">
+    Click "Approve" to execute the swap on Base Sepolia
+  </Step>
+  <Step title="Transaction Complete">
+    View transaction hash and updated balances
+  </Step>
+</Steps>
+
+## Portfolio Integration
+
+AI chat connects directly to your wallet for real-time data:
+
+```typescript
+// From DCAPage.tsx - Portfolio query handling
+if (isPortfolioQuery(userInput)) {
+  const portfolio = await getUserPortfolio(address);
+  const specificToken = extractTokenQuery(userInput);
+  
+  if (specificToken) {
+    responseText = formatTokenBalance(portfolio, specificToken);
+  } else {
+    responseText = formatPortfolioForAI(portfolio);
+  }
+}
+```
+
+<Note>
+**Privacy:** Portfolio queries are read-only and never require wallet signatures. Your private keys remain secure.
+</Note>
+
+## Chat History
+
+Conversations are automatically saved per wallet address:
+
+- **Persistent Storage:** Chat history stored in browser localStorage
+- **Wallet-Specific:** Each wallet has separate conversation history
+- **Auto-Resume:** Conversations resume when you reconnect
+- **New Chat:** Click "New Chat" to start a fresh conversation
+
+## Example Workflow
+
+### Buying Crypto with AI
+
+<Steps>
+  <Step title="Check Balance">
+    **User:** "How much USDC do I have?"
+    
+    **AI:** Shows your USDC balance from wallet
+  </Step>
+  <Step title="Place Order">
+    **User:** "Buy $50 worth of BTC"
+    
+    **AI:** Creates a trade confirmation card with details
+  </Step>
+  <Step title="Review & Confirm">
+    Review the trade card showing:
+    - Amount: $50 USDC
+    - Token: BTC
+    - Current price
+    - Estimated BTC to receive
+    - Slippage: 0.5%
+  </Step>
+  <Step title="Execute">
+    Click **"Execute Trade"** button on the card
+    
+    Wallet popup appears for transaction approval
+  </Step>
+  <Step title="Confirmation">
+    **AI:** "✅ Transaction Successful! Tx Hash: 0x123..."
+    
+    View on Base Sepolia explorer
+  </Step>
+</Steps>
+
+## Advanced Features
+
+### MAX Amount Detection
+
+Use "all" or "max" to trade your entire balance:
+
+```typescript
+// Examples:
+"sell all BTC"        → Sells entire BTC balance
+"swap max SOL to ADA" → Swaps all SOL to ADA
+"buy BTC with all usdc in my wallet" → Spends all USDC
+```
+
+### Multi-Token Swap Detection
+
+AI automatically detects direct swaps vs. routed swaps:
+
+- **Direct Swap:** `sell 100$ BTC in ADA` → BTC → ADA (via USDC router)
+- **Simple Sell:** `sell 100$ BTC` → BTC → USDC
+
+### Slippage Protection
+
+Default slippage is 0.5% for all trades, protecting against price movements.
+
+<Warning>
+**High Volatility:** During high market volatility, trades may fail if price moves beyond slippage tolerance. The AI will suggest increasing slippage if needed.
+</Warning>
+
+## Technical Details
+
+### API Integration
+
+```typescript
+// From groqService.ts
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL = 'x-ai/grok-4.1-fast:free';
+
+const response = await fetch(OPENROUTER_API_URL, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    model: OPENROUTER_MODEL,
+    messages: conversationHistory,
+    temperature: 0.01
+  })
+});
+```
+
+### Supported Tokens
+
+The AI supports these tokens for trading:
+
+- **BTC** (Bitcoin)
+- **ETH** (Ethereum) - Display only
+- **SOL** (Solana)
+- **BNB** (BNB Chain)
+- **XRP** (Ripple)
+- **TON** (Toncoin)
+- **AVAX** (Avalanche)
+- **TRX** (TRON)
+- **ADA** (Cardano)
+- **DOGE** (Dogecoin)
+- **USDC** (Stablecoin)
+
+## Tips for Best Results
+
+<CardGroup cols={2}>
+  <Card title="Be Specific" icon="bullseye">
+    Use exact amounts: "buy $100 BTC" not "buy some BTC"
+  </Card>
+  <Card title="Check Balances First" icon="magnifying-glass">
+    Always verify you have sufficient balance before trading
+  </Card>
+  <Card title="Use Context" icon="link">
+    Follow up commands work: "How much SOL?" then "Sell it all"
+  </Card>
+  <Card title="Review Cards Carefully" icon="eye">
+    Always check trade confirmation cards before executing
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Trade Card Not Appearing
+
+- Ensure you specified both amount and token
+- Check your command includes "buy", "sell", or "swap"
+- Try rephrasing: "purchase 0.5 BTC" instead of "get BTC"
+
+### "Insufficient Balance" Error
+
+- Verify your wallet balance: "show my portfolio"
+- Ensure you have enough of the source token
+- For swaps, you need the `fromToken` balance
+
+### Transaction Failing
+
+- Check you have USDC for gas fees
+- Increase slippage if market is volatile
+- Ensure contract approvals are granted
+
+<Info>
+**Gas Fees:** All transactions on Base Sepolia require USDC for gas. The platform automatically handles gas fee calculations.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create DCA Plans" icon="calendar" href="/features/dca-investing">
+    Learn how to automate investments
+  </Card>
+  <Card title="Trading Interface" icon="chart-candlestick" href="/features/trading">
+    Explore the manual trading page
+  </Card>
+  <Card title="Portfolio Tracking" icon="wallet" href="/features/portfolio">
+    Track your crypto holdings
+  </Card>
+  <Card title="Swap Tokens" icon="arrows-rotate" href="/features/swap">
+    Direct token swaps interface
+  </Card>
+</CardGroup>
